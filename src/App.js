@@ -113,6 +113,12 @@ export default function App() {
     }, [promptTemplate, variables]);
     
     // --- Handlers ---
+    const handleVariableChange = (index, value) => {
+        const newVariables = [...variables];
+        newVariables[index].value = value;
+        setVariables(newVariables);
+    };
+
     const handleTestPrompt = async () => {
         setIsLoading(true);
         setApiResponse('');
@@ -227,7 +233,7 @@ export default function App() {
 
                         {variables.length > 0 && (
                           <Card title="Variables" icon={<ArrowRight className="text-green-400" />}>
-                            <div className="space-y-4 max-h-60 overflow-y-auto pr-2">{variables.map((v, i) => (<div key={i}><label className="block text-sm font-medium text-gray-300 mb-1.5 font-mono">{v.name}</label><input type="text" value={v.value} onChange={(e) => setVariables(vars => vars.map((item, idx) => idx === i ? {...item, value: e.target.value} : item))} className="w-full bg-gray-900/50 border border-white/10 rounded-lg p-2 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none" /></div>))}</div>
+                            <div className="space-y-4 max-h-60 overflow-y-auto pr-2">{variables.map((v, i) => (<div key={i}><label className="block text-sm font-medium text-gray-300 mb-1.5 font-mono">{v.name}</label><input type="text" value={v.value} onChange={(e) => handleVariableChange(i, e.target.value)} className="w-full bg-gray-900/50 border border-white/10 rounded-lg p-2 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none" /></div>))}</div>
                           </Card>
                         )}
 
