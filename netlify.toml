@@ -1,4 +1,4 @@
 [build]
-  base = ""
+  base = "prompt-studio-app"
   publish = "build"
   command = "npm run build"
