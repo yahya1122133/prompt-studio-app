@@ -7,7 +7,7 @@ const Card = ({ children, className = '', title, icon, actions }) => (
         {(title || icon || actions) && (
             <div className="flex items-center justify-between p-4 border-b border-white/10">
                 <div className="flex items-center gap-3">
-                    {icon}
+                    <div>{icon}</div>
                     <h2 className="text-lg font-semibold text-white">{title}</h2>
                 </div>
                 {actions && <div className="flex items-center gap-2">{actions}</div>}
