@@ -696,7 +696,6 @@ export default function App() {
 
 // --- Netlify Function Code (for reference, not part of the React app) ---
 const fetch = require('node-fetch');
-
 exports.handler = async (event) => {
   try {
     const { prompt, temperature } = JSON.parse(event.body);
