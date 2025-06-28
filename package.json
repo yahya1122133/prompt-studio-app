@@ -8,10 +8,12 @@
     "@testing-library/user-event": "^13.5.0",
     "lucide-react": "^0.378.0",
     "node-fetch": "^3.3.2",
+    "path-browserify": "^1.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-helmet-async": "^2.0.5",
     "react-scripts": "^5.0.1",
+    "util": "^0.12.5",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
@@ -54,5 +56,17 @@
   },
   "engines": {
     "node": "18.x"
+  },
+  "browser": {
+    "node:buffer": false,
+    "node:fs": false,
+    "node:https": false,
+    "node:http": false,
+    "node:net": false,
+    "node:path": false,
+    "node:stream": false,
+    "node:url": false,
+    "node:util": false,
+    "node:zlib": false
   }
 }
