@@ -3,7 +3,7 @@
   publish = "build"
 
 [functions]
-  node_bundler = "esbuild"  # Add this
+  node_bundler = "esbuild"
 
 [build.environment]
-  NODE_VERSION = "18"  # Gemini 2.0 requires Node 18+
+  NODE_VERSION = "18"
