@@ -437,7 +437,7 @@ export default function App() {
                                         Model
                                     </h3>
                                     <p className="text-sm text-gray-400 bg-gray-900/50 border border-white/10 rounded-lg py-2 px-3">
-                                        Gemini 1.5 Flash (Default)
+                                        Gemini 2.0 Flash
                                     </p>
                                 </div>
                                 <div>
