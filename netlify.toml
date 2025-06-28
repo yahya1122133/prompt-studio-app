@@ -1,3 +1,9 @@
 [build]
-  publish = "build"
   command = "npm run build"
+  publish = "build"
+
+[functions]
+  node_bundler = "esbuild"  # Add this
+
+[build.environment]
+  NODE_VERSION = "18"  # Gemini 2.0 requires Node 18+

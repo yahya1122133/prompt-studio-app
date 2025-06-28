@@ -224,24 +224,24 @@ export default function App() {
                 throw new Error("API Key is missing.");
             }
             
-            const model = 'gemini-1.5-flash';
+            const model = 'gemini-2.0-flash';
 
             const payload = {
-              contents: [{
-                parts: [{ text: finalPrompt }]
-              }],
-              generationConfig: {
-                temperature: parseFloat(temperature),
-                topK: 1,
-                topP: 0.95,
-                maxOutputTokens: 2048
-              },
-              safetySettings: [
-                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }
-              ]
+                contents: [{
+                    parts: [{ text: finalPrompt }]
+                }],
+                generationConfig: {
+                    temperature: parseFloat(temperature),
+                    topK: 1,
+                    topP: 0.95,
+                    maxOutputTokens: 2048
+                },
+                safetySettings: [
+                    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }
+                ]
             };
             
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -693,3 +693,61 @@ export default function App() {
         </div>
     );
 }
+
+// --- Netlify Function Code (for reference, not part of the React app) ---
+const fetch = require('node-fetch');
+
+exports.handler = async (event) => {
+  try {
+    const { prompt, temperature } = JSON.parse(event.body);
+    const apiKey = process.env.GEMINI_API_KEY;
+    
+    const response = await fetch(
+      'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=' + apiKey,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{ text: prompt }]
+          }],
+          generationConfig: {
+            temperature: parseFloat(temperature),
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 2048
+          },
+          safetySettings: [
+            {
+              category: "HARM_CATEGORY_HARASSMENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_HATE_SPEECH",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        })
+      }
+    );
+
+    const data = await response.json();
+    return {
+      statusCode: 200,
+      body: JSON.stringify(data)
+    };
+  } catch (error) {
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: error.message })
+    };
+  }
+};
