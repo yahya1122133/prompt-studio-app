@@ -6,6 +6,7 @@
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
+    "core-js": "^3.43.0",
     "lucide-react": "^0.378.0",
     "node-fetch": "^3.3.2",
     "path-browserify": "^1.0.1",
@@ -16,7 +17,11 @@
     "util": "^0.12.5",
     "web-vitals": "^2.1.4"
   },
+  "resolutions": {
+    "core-js": "3.43.0"
+  },
   "scripts": {
+    "preinstall": "npx npm-force-resolutions",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
@@ -40,33 +45,7 @@
       "last 1 safari version"
     ]
   },
-  "devDependencies": {
-    "assert": "^2.1.0",
-    "autoprefixer": "^10.4.19",
-    "buffer": "^6.0.3",
-    "crypto-browserify": "^3.12.1",
-    "https-browserify": "^1.0.0",
-    "os-browserify": "^0.3.0",
-    "postcss": "^8.4.38",
-    "process": "^0.11.10",
-    "stream-browserify": "^3.0.0",
-    "stream-http": "^3.2.0",
-    "tailwindcss": "^3.4.17",
-    "url": "^0.11.4"
-  },
   "engines": {
     "node": "18.x"
-  },
-  "browser": {
-    "node:buffer": false,
-    "node:fs": false,
-    "node:https": false,
-    "node:http": false,
-    "node:net": false,
-    "node:path": false,
-    "node:stream": false,
-    "node:url": false,
-    "node:util": false,
-    "node:zlib": false
   }
 }
