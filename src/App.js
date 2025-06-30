@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, createContext, useContext, useReducer, useRef } from 'react';
+import React, { useState, useEffect, useReducer, createContext, useContext, useRef } from 'react';
 import { ArrowRight, Book, Bot, Copy, History, Loader2, Save, Search, Settings, Trash2, Wand2, X, Plus, Sparkles } from 'lucide-react';
 
 // ===== HELPER FUNCTIONS =====
@@ -448,13 +448,6 @@ const AIPromptGenerator = () => {
       });
     }
   };
-
-  const finalPrompt = useMemo(() => {
-    return state.variables.reduce((acc, curr) => {
-      const regex = new RegExp(`{{\\s*${curr.name}\\s*}}`, 'g');
-      return acc.replace(regex, curr.value || `{{${curr.name}}}`);
-    }, state.promptTemplate);
-  }, [state.promptTemplate, state.variables]);
 
   return (
     <Card 
