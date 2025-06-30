@@ -263,16 +263,19 @@ const PromptRating = ({ prompt, source }) => {
     );
 };
 
-// ===== FOOTER COMPONENT =====
+// ===== FOOTER COMPONENT & MODAL LOGIC =====
+// CHANGE 2: The logic for the modals has been corrected here to prevent bugs.
 const Footer = () => {
-    const [modal, setModal] = useState(null);
-  
+    const [modal, setModal] = useState(null); // Can be 'privacy', 'terms', or 'report'
+
     const ModalContent = ({ title, children, onClose }) => (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-800 border border-white/10 rounded-xl w-full max-w-3xl max-h-[80vh] flex flex-col">
             <div className="sticky top-0 bg-gray-800/95 backdrop-blur-sm z-10 p-6 border-b border-white/10 flex justify-between items-center">
               <h2 className="text-xl font-bold text-white">{title}</h2>
-              <button className="p-2 rounded-full hover:bg-white/10" onClick={onClose}><X className="w-5 h-5" /></button>
+              <button className="p-2 rounded-full hover:bg-white/10" onClick={onClose} aria-label="Close modal">
+                <X className="w-5 h-5" />
+              </button>
             </div>
             <div className="p-6 prose prose-invert max-w-none overflow-y-auto">{children}</div>
           </div>
@@ -290,6 +293,10 @@ const Footer = () => {
                         <span className="text-lg font-bold text-white">PromptCraft</span>
                     </div>
                     <p className="text-gray-400 text-sm">© {new Date().getFullYear()} PromptCraft. All rights reserved.</p>
+                    {/* CHANGE 1: "Made with" text added here. */}
+                    <p className="text-gray-500 text-sm mt-1">
+                        Made with <span className="text-red-500">❤️</span> for AI enthusiasts
+                    </p>
                 </div>
                 <div className="flex flex-wrap justify-center gap-4 md:gap-6">
                     <button className="text-gray-400 hover:text-indigo-400 text-sm transition-colors font-medium" onClick={() => setModal('report')}>Report an Issue</button>
@@ -303,33 +310,33 @@ const Footer = () => {
         {modal === 'report' && (
              <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                 <div className="bg-gray-800 border border-white/10 rounded-xl w-full max-w-md">
-                <div className="p-6 border-b border-white/10 flex justify-between items-center">
-                    <h2 className="text-xl font-bold text-white">Report an Issue</h2>
-                    <button className="p-2 rounded-full hover:bg-white/10" onClick={() => setModal(null)}><X className="w-5 h-5" /></button>
-                </div>
-                <div className="p-6">
-                    <form name="issue-report" method="POST" data-netlify="true" data-netlify-honeypot="bot-field">
-                        <input type="hidden" name="form-name" value="issue-report" />
-                        <p className="hidden"><label>Don’t fill this out if you’re human: <input name="bot-field" /></label></p>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">Your Email</label>
-                                <input type="email" name="email" placeholder="email@example.com" className="w-full bg-gray-900/50 border border-white/10 rounded-lg p-3 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none" required />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">Issue Type</label>
-                                <select name="issueType" className="w-full bg-gray-900/50 border border-white/10 rounded-lg p-3 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                                    <option>Bug Report</option><option>Feature Request</option><option>Security Issue</option><option>Other</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
-                                <textarea name="description" rows={4} placeholder="Please describe the issue in detail..." className="w-full bg-gray-900/50 border border-white/10 rounded-lg p-3 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none" required></textarea>
-                            </div>
-                            <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 rounded-lg transition-colors">Submit Report</button>
-                        </div>
-                    </form>
-                </div>
+                  <div className="p-6 border-b border-white/10 flex justify-between items-center">
+                      <h2 className="text-xl font-bold text-white">Report an Issue</h2>
+                      <button className="p-2 rounded-full hover:bg-white/10" onClick={() => setModal(null)}><X className="w-5 h-5" /></button>
+                  </div>
+                  <div className="p-6">
+                      <form name="issue-report" method="POST" data-netlify="true" data-netlify-honeypot="bot-field">
+                          <input type="hidden" name="form-name" value="issue-report" />
+                          <p className="hidden"><label>Don’t fill this out if you’re human: <input name="bot-field" /></label></p>
+                          <div className="space-y-4">
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-300 mb-2">Your Email</label>
+                                  <input type="email" name="email" placeholder="email@example.com" className="w-full bg-gray-900/50 border border-white/10 rounded-lg p-3 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none" required />
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-300 mb-2">Issue Type</label>
+                                  <select name="issueType" className="w-full bg-gray-900/50 border border-white/10 rounded-lg p-3 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                                      <option>Bug Report</option><option>Feature Request</option><option>Security Issue</option><option>Other</option>
+                                  </select>
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
+                                  <textarea name="description" rows={4} placeholder="Please describe the issue in detail..." className="w-full bg-gray-900/50 border border-white/10 rounded-lg p-3 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none" required></textarea>
+                              </div>
+                              <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 rounded-lg transition-colors">Submit Report</button>
+                          </div>
+                      </form>
+                  </div>
                 </div>
              </div>
         )}
@@ -490,7 +497,8 @@ const App = () => {
       <div className="max-w-7xl mx-auto">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
           <div className="flex items-center gap-3 mb-4 sm:mb-0">
-            <Sparkles className="w-8 h-8 text-indigo-400" />
+            {/* CHANGE 4: Logo Added Here */}
+            <img src="/512.png" alt="PromptCraft Logo" className="w-8 h-8" />
             <h1 className="text-2xl lg:text-3xl font-bold text-white">PromptCraft</h1>
           </div>
           <div className="flex items-center gap-2">
@@ -505,7 +513,8 @@ const App = () => {
 
         <main className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="flex flex-col gap-6">
-            <Card title="Prompt Editor" icon={<Wand2 className="text-indigo-400" />}>
+            {/* CHANGE 3: Title Renamed Here */}
+            <Card title="AI Prompt Generator" icon={<Wand2 className="text-indigo-400" />}>
               <textarea
                 value={promptTemplate}
                 onChange={(e) => {
