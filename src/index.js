@@ -1,14 +1,15 @@
 import './polyfills';  // Must be first
 import React from 'react';
-import ReactDOM from 'react-dom/client';
+import ReactDOM from 'react-dom';
 import './index.css';
 import App from './App';
+import { PromptProvider } from './PromptContext';
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
-  <React.StrictMode>
+ReactDOM.render(
+  <PromptProvider>
     <App />
-  </React.StrictMode>
+  </PromptProvider>,
+  document.getElementById('root')
 );
 
 // Modern polyfill loader - only loads what's needed

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
 
@@ -22,15 +22,18 @@ const localStorageMock = (() => {
 beforeAll(() => {
   Object.defineProperty(window, 'localStorage', {
     value: localStorageMock,
-    writable: true
   });
+  
+  // Mock fetch globally
+  global.fetch = jest.fn();
 });
 
 beforeEach(() => {
   window.localStorage.clear();
+  jest.clearAllMocks();
   
-  // Mock fetch globally
-  global.fetch = jest.fn(() =>
+  // Mock successful API responses by default
+  global.fetch.mockImplementation(() =>
     Promise.resolve({
       ok: true,
       json: () => Promise.resolve({
@@ -42,10 +45,6 @@ beforeEach(() => {
       }),
     })
   );
-});
-
-afterEach(() => {
-  jest.clearAllMocks();
 });
 
 describe('Prompt Studio App', () => {
@@ -69,6 +68,10 @@ describe('Prompt Studio App', () => {
       expect(screen.getByLabelText(/name/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/location/i)).toBeInTheDocument();
     });
+    
+    const nameInput = screen.getByLabelText(/name/i);
+    await user.type(nameInput, 'John');
+    expect(nameInput).toHaveValue('John');
   });
 
   test('tests prompt with Gemini API', async () => {
@@ -124,6 +127,42 @@ describe('Prompt Studio App', () => {
         expect(screen.getByText(/Test Prompt/i)).toBeInTheDocument();
       });
     });
+
+    test('deletes prompts', async () => {
+      // Pre-populate with a prompt
+      window.localStorage.setItem('promptStudioPrompts', JSON.stringify([{
+        id: '1',
+        name: 'Saved Prompt',
+        template: 'Saved template',
+        temperature: 0.7,
+        savedAt: Date.now()
+      }]));
+      
+      render(<App />);
+      const user = userEvent.setup();
+      
+      // Open library
+      const libraryButton = screen.getByText(/My Library/i);
+      await user.click(libraryButton);
+      
+      // Hover to show delete button
+      const promptItem = await screen.findByText(/Saved Prompt/i);
+      await user.hover(promptItem);
+      
+      // Delete prompt
+      const deleteButton = await screen.findByRole('button', { name: /Delete/i });
+      await user.click(deleteButton);
+      
+      // Confirm deletion
+      const confirmButton = await screen.findByRole('button', { name: /Delete/i });
+      await user.click(confirmButton);
+      
+      // Verify deletion
+      await waitFor(() => {
+        expect(screen.queryByText(/Saved Prompt/i)).not.toBeInTheDocument();
+        expect(screen.getByText(/Prompt deleted/i)).toBeInTheDocument();
+      });
+    });
   });
 
   describe('AI Prompt Generator', () => {
@@ -142,6 +181,8 @@ describe('Prompt Studio App', () => {
       // Verify results
       await waitFor(() => {
         expect(screen.getByText(/Generated prompt 1/i)).toBeInTheDocument();
+        expect(screen.getByText(/Generated prompt 2/i)).toBeInTheDocument();
+        expect(screen.getByText(/Generated prompt 3/i)).toBeInTheDocument();
       });
     });
 
@@ -149,12 +190,37 @@ describe('Prompt Studio App', () => {
       render(<App />);
       const user = userEvent.setup();
       
+      // Verify auto mode off by default
+      expect(screen.getByText(/Auto Mode/i)).toHaveTextContent(/Off/);
+      
       // Toggle auto mode
       const autoModeToggle = screen.getByLabelText(/Auto Mode/i);
       await user.click(autoModeToggle);
       
       // Verify auto mode enabled
       expect(screen.getByText(/Auto Mode/i)).toHaveTextContent(/Active/);
+    });
+
+    test('rates generated prompts', async () => {
+      render(<App />);
+      const user = userEvent.setup();
+      
+      // Generate some prompts
+      const input = screen.getByPlaceholderText(/Describe what you need/i);
+      await user.type(input, 'test input');
+      const generateButton = screen.getByRole('button', { name: /Generate with DeepSeek/i });
+      await user.click(generateButton);
+      
+      // Wait for prompts to appear
+      await screen.findByText(/Generated prompt 1/i);
+      
+      // Rate a prompt
+      const promptContainer = screen.getByText(/Generated prompt 1/i).closest('div');
+      const stars = within(promptContainer).getAllByRole('button', { name: /Rate \d stars/i });
+      await user.click(stars[4]); // Click 5th star
+      
+      // Verify rating UI update
+      expect(stars[4]).toContainHTML('⭐'); // Should now be a filled star
     });
   });
 
@@ -167,6 +233,14 @@ describe('Prompt Studio App', () => {
     const editor = screen.getByPlaceholderText(/e.g., Generate a tweet about/i);
     await user.type(editor, 'Persistent prompt');
     
+    const nameInput = screen.getByPlaceholderText(/Enter a name for this prompt/i);
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Persistent Prompt');
+    
+    // Change temperature
+    const tempSlider = screen.getByLabelText(/Temperature/i);
+    fireEvent.change(tempSlider, { target: { value: '0.9' } });
+    
     // Unmount (simulate closing app)
     unmount();
     
@@ -176,6 +250,14 @@ describe('Prompt Studio App', () => {
     // Verify persistence
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/e.g., Generate a tweet about/i)).toHaveValue('Persistent prompt');
+      expect(screen.getByPlaceholderText(/Enter a name for this prompt/i)).toHaveValue('Persistent Prompt');
+      expect(screen.getByLabelText(/Temperature/i)).toHaveValue('0.9');
     });
+  });
+
+  test('renders learn react link', () => {
+    render(<App />);
+    const linkElement = screen.getByText(/learn react/i);
+    expect(linkElement).toBeInTheDocument();
   });
 });
