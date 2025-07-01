@@ -1,43 +1,31 @@
+# Build settings for a function-only deployment.
+# We don't need a build command or publish directory.
 [build]
-  command = "npm run build"
-  publish = "build"
   functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "18"
-  NODE_ENV = "production"
 
 # Global function settings
 [functions]
   node_bundler = "esbuild"
-  timeout = 10 # Default 10-second timeout for all functions
+  # The global timeout is removed from here
 
 # Specific configuration for the "ai-proxy" function
 [functions."ai-proxy"]
-  timeout = 20 # Overrides the default timeout to 20 seconds
+  timeout = 20 # Timeout is now set only on the specific function
 
-[prerendering]
-  enable = true
-  cache_control = "public, max-age=3600"
-  include = ["/*"]
-  exclude = ["/admin/*", "/api/*", "/.netlify/functions/*"]
 
-# Security headers
+# Security headers for your API endpoint
 [[headers]]
-  for = "/*"
+  for = "/api/*"
   [headers.values]
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://identity.netlify.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://api.deepseek.com; frame-src 'self'"
 
-# Plugins
-[[plugins]]
-  package = "@netlify/plugin-sitemap"
-  [plugins.inputs]
-    baseUrl = "https://promptmakers.app"
-
-# Netlify Edge Functions (replaces deprecated Edge Handlers)
-[[edge_functions]]
-  path = "/some-path" # Define the path this edge function will intercept
-  function = "my-edge-function-name" # The name of the function file in your edge functions directory
+# Redirect rule to make your function available at a clean URL
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/ai-proxy/:splat"
+  status = 200
