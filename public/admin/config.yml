@@ -1,16 +1,108 @@
 backend:
   name: git-gateway
   branch: main
+  commit_messages:
+    create: "Create {{collection}} '{{slug}}'"
+    update: "Update {{collection}} '{{slug}}'"
+    delete: "Delete {{collection}} '{{slug}}'"
+    uploadMedia: "Upload '{{path}}'"
+    deleteMedia: "Delete '{{path}}'"
 
-media_folder: "public/images"
-public_folder: "/images"
+media_folder: "public/images/uploads"
+public_folder: "/images/uploads"
 
 collections:
   - name: "prompts"
     label: "Prompts"
     folder: "src/content/prompts"
     create: true
+    slug: "{{slug}}"
+    identifier_field: title
+    summary: "{{title}} ({{category}})"
+    sortable_fields: ["title", "date"]
+    view_filters:
+      - label: "Marketing"
+        field: category
+        pattern: "Marketing"
+      - label: "Technical"
+        field: category
+        pattern: "Technical"
+      - label: "Creative"
+        field: category
+        pattern: "Creative"
     fields:
-      - { name: "title", label: "Title", widget: "string" }
-      - { name: "template", label: "Prompt Template", widget: "text" }
-      - { name: "category", label: "Category", widget: "string" }
+      - { name: "title", label: "Title", widget: "string", required: true }
+      - { name: "description", label: "Description", widget: "text", required: true }
+      - name: "category"
+        label: "Category"
+        widget: "select"
+        options: 
+          - { label: "Marketing", value: "Marketing" }
+          - { label: "Technical", value: "Technical" }
+          - { label: "Creative", value: "Creative" }
+          - { label: "Productivity", value: "Productivity" }
+        required: true
+      - name: "template"
+        label: "Prompt Template"
+        widget: "code"
+        default_language: markdown
+        output_code_only: true
+        required: true
+      - name: "variables"
+        label: "Variables"
+        widget: "list"
+        fields:
+          - { label: "Variable Name", name: "name", widget: "string" }
+          - { label: "Default Value", name: "default", widget: "string", required: false }
+      - name: "preview_image"
+        label: "Preview Image"
+        widget: "image"
+        required: false
+        media_library: 
+          config: 
+            multiple: false
+      - name: "tags"
+        label: "Tags"
+        widget: "list"
+        default: ["AI", "Prompt"]
+        required: false
+      - name: "featured"
+        label: "Featured Prompt"
+        widget: "boolean"
+        default: false
+        required: false
+      - name: "author"
+        label: "Author"
+        widget: "relation"
+        collection: "authors"
+        value_field: "{{slug}}"
+        display_fields: ["name"]
+        search_fields: ["name"]
+        required: false
+
+  - name: "authors"
+    label: "Authors"
+    folder: "src/content/authors"
+    create: true
+    identifier_field: name
+    fields:
+      - { name: "name", label: "Full Name", widget: "string", required: true }
+      - { name: "bio", label: "Bio", widget: "text", required: false }
+      - name: "avatar"
+        label: "Avatar"
+        widget: "image"
+        required: false
+        media_library: 
+          config: 
+            multiple: false
+
+  - name: "pages"
+    label: "Pages"
+    files:
+      - name: "about"
+        label: "About Page"
+        file: "src/content/pages/about.md"
+        fields:
+          - { name: "title", label: "Title", widget: "string", required: true }
+          - { name: "description", label: "Meta Description", widget: "string", required: true }
+          - { name: "body", label: "Content", widget: "markdown", required: true }

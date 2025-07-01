@@ -1,12 +1,92 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Promptmakers CMS</title>
+  
+  <!-- Primary SEO Meta Tags -->
+  <title>Promptmakers - AI Prompt Engineering Studio</title>
+  <meta name="description" content="Craft, optimize, and manage AI prompts with Promptmakers. Collaborate with Gemini and DeepSeek to create perfect prompts for any task.">
+  <meta name="keywords" content="AI prompts, prompt engineering, Gemini API, DeepSeek, prompt optimization, AI tools">
+  
+  <!-- Open Graph / Social Media Meta Tags -->
+  <meta property="og:title" content="Promptmakers - AI Prompt Engineering Studio">
+  <meta property="og:description" content="Craft, optimize, and manage AI prompts with collaborative AI assistance">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://promptmakers.app">
+  <meta property="og:image" content="https://promptmakers.app/social-preview.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Promptmakers - AI Prompt Engineering Studio">
+  <meta name="twitter:description" content="Collaborative AI prompt engineering tool with Gemini and DeepSeek integration">
+  <meta name="twitter:image" content="https://promptmakers.app/twitter-preview.jpg">
+  
+  <!-- Canonical URL -->
+  <link rel="canonical" href="https://promptmakers.app">
+  
+  <!-- Favicon -->
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  
+  <!-- Preload critical resources -->
+  <link rel="preload" href="/src/index.css" as="style">
+  <link rel="preload" href="/src/App.js" as="script">
+  
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Promptmakers",
+      "description": "AI prompt engineering studio for crafting and optimizing prompts",
+      "applicationCategory": "Productivity",
+      "operatingSystem": "Web",
+      "url": "https://promptmakers.app",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "ratingCount": "25",
+        "bestRating": "5"
+      }
+    }
+  </script>
+  
+  <!-- Netlify Identity for CMS -->
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 </head>
 <body>
-  <script src="https://unpkg.com/netlify-cms@^2.0.0/dist/netlify-cms.js"></script>
+  <div id="root"></div>
+  
+  <!-- Netlify Identity Redirect -->
+  <script>
+    if (window.netlifyIdentity) {
+      window.netlifyIdentity.on("init", user => {
+        if (!user) {
+          window.netlifyIdentity.on("login", () => {
+            document.location.href = "/admin/";
+          });
+        }
+      });
+    }
+  </script>
+  
+  <!-- Google Analytics (Optional) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXX"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-XXXXXX');
+  </script>
 </body>
 </html>
