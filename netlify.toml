@@ -7,14 +7,14 @@
   NODE_VERSION = "18"
   NODE_ENV = "production"
 
+# Global function settings
 [functions]
   node_bundler = "esbuild"
-  timeout = 10
+  timeout = 10 # Default 10-second timeout for all functions
 
-# Per-function configuration
-[[functions]]
-  path = "ai-proxy.js"
-  timeout = 20
+# Specific configuration for the "ai-proxy" function
+[functions."ai-proxy"]
+  timeout = 20 # Overrides the default timeout to 20 seconds
 
 [prerendering]
   enable = true
@@ -37,6 +37,7 @@
   [plugins.inputs]
     baseUrl = "https://promptmakers.app"
 
-# Edge Handlers
-[build.edge_handlers]
-  directory = "edge-handlers"
+# Netlify Edge Functions (replaces deprecated Edge Handlers)
+[[edge_functions]]
+  path = "/some-path" # Define the path this edge function will intercept
+  function = "my-edge-function-name" # The name of the function file in your edge functions directory
