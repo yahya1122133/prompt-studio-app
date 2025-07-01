@@ -1,29 +1,26 @@
 [build]
   command = "npm run build"
   publish = "build"
-  functions = "netlify/functions"  # Your function directory
+  functions = "netlify/functions"
 
 [build.environment]
-  NODE_VERSION = "18"  # Good choice for compatibility
-  NODE_ENV = "production"  # Add this for production optimizations
+  NODE_VERSION = "18"
+  NODE_ENV = "production"
 
-# Function-specific configuration
 [functions]
-  node_bundler = "esbuild"  # Faster bundling
-  # Set timeout for all functions
-  timeout = 10  # Seconds (free tier max)
-  
-  # Longer timeout specifically for AI proxy
-  [[functions]]
-    path = "ai-proxy.js"  # Your main AI function
-    timeout = 20  # Max allowed on Pro plan
+  node_bundler = "esbuild"
+  timeout = 10
 
-# Prerendering configuration
+# Per-function configuration
+[[functions]]
+  path = "ai-proxy.js"
+  timeout = 20
+
 [prerendering]
   enable = true
-  cache_control = "public, max-age=3600"  # 1 hour cache
+  cache_control = "public, max-age=3600"
   include = ["/*"]
-  exclude = ["/admin/*", "/api/*", "/.netlify/functions/*"]  # Add function exclusion
+  exclude = ["/admin/*", "/api/*", "/.netlify/functions/*"]
 
 # Security headers
 [[headers]]
@@ -37,7 +34,9 @@
 # Plugins
 [[plugins]]
   package = "@netlify/plugin-sitemap"
-  
-# Optional: Build caching for faster deploys
+  [plugins.inputs]
+    baseUrl = "https://promptmakers.app"
+
+# Edge Handlers
 [build.edge_handlers]
   directory = "edge-handlers"
