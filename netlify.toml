@@ -1,9 +1,43 @@
 [build]
   command = "npm run build"
   publish = "build"
-
-[[plugins]]
-  package = "@netlify/plugin-sitemap"
+  functions = "netlify/functions"  # Your function directory
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "18"  # Good choice for compatibility
+  NODE_ENV = "production"  # Add this for production optimizations
+
+# Function-specific configuration
+[functions]
+  node_bundler = "esbuild"  # Faster bundling
+  # Set timeout for all functions
+  timeout = 10  # Seconds (free tier max)
+  
+  # Longer timeout specifically for AI proxy
+  [[functions]]
+    path = "ai-proxy.js"  # Your main AI function
+    timeout = 20  # Max allowed on Pro plan
+
+# Prerendering configuration
+[prerendering]
+  enable = true
+  cache_control = "public, max-age=3600"  # 1 hour cache
+  include = ["/*"]
+  exclude = ["/admin/*", "/api/*", "/.netlify/functions/*"]  # Add function exclusion
+
+# Security headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://identity.netlify.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://api.deepseek.com; frame-src 'self'"
+
+# Plugins
+[[plugins]]
+  package = "@netlify/plugin-sitemap"
+  
+# Optional: Build caching for faster deploys
+[build.edge_handlers]
+  directory = "edge-handlers"

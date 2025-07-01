@@ -332,6 +332,12 @@ const Footer = () => {
                                <textarea name="description" rows={4} placeholder="Please describe the issue in detail..." className="w-full bg-gray-900/50 border border-white/10 rounded-lg p-3 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none" required></textarea>
                            </div>
                            <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white font-medium py-3 rounded-lg transition-opacity">Submit Report</button>
+                           <p className="mt-6 text-center text-gray-400 text-sm">
+    Or email us directly at:<br />
+    <a href="mailto:mindsetwarriorsacademy@gmail.com" className="text-indigo-400 hover:underline break-all">
+      mindsetwarriorsacademy@gmail.com
+    </a>
+  </p>
                        </div>
                    </form>
                  </div>
@@ -479,32 +485,42 @@ const App = () => {
     showStatus("Generating response...", "info", 5000);
     
     try {
-        const response = await fetch('/.netlify/functions/generate', {
-            method: 'POST',
-            body: JSON.stringify({
-                finalPrompt: promptToGenerate,
-                provider: providerOverride || provider,
-                temperature
-            })
+      const response = await fetch('/.netlify/functions/ai-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: providerOverride || provider,
+          prompt: promptToGenerate,
+          temperature
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'An unknown error occurred.');
+      }
+
+      // Handle auto mode response differently
+      if ((providerOverride || provider) === 'auto' && data.components) {
+        dispatch({
+          type: 'SET_API_RESPONSE', 
+          payload: `### Auto Mode Results\n\n**Original Prompt:**\n${promptToGenerate}\n\n**Analysis:**\n${data.components.analysis}\n\n**Improved Prompt:**\n${data.components.improved}\n\n**Validation:**\n${data.components.validation}`
         });
-
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.message || 'An unknown error occurred.');
-        }
-
-        dispatch({ type: 'SET_API_RESPONSE', payload: data.result });
-        dispatch({ type: 'ADD_TO_HISTORY', payload: data.result });
-        showStatus(`Success! (from ${data.source})`, "success");
-        dispatch({ type: 'LEARN_FROM_SUCCESS', payload: promptToGenerate });
+      } else {
+        dispatch({ type: 'SET_API_RESPONSE', payload: data.text });
+      }
+      
+      dispatch({ type: 'ADD_TO_HISTORY', payload: data.text });
+      showStatus(`Success! (from ${data.provider})`, "success");
+      dispatch({ type: 'LEARN_FROM_SUCCESS', payload: promptToGenerate });
 
     } catch (error) {
-        console.error('API Error:', error);
-        const errorMessage = `Error: ${error.message}`;
-        dispatch({ type: 'SET_API_RESPONSE', payload: errorMessage });
-        showStatus(errorMessage, "error", 5000);
+      console.error('API Error:', error);
+      const errorMessage = `Error: ${error.message}`;
+      dispatch({ type: 'SET_API_RESPONSE', payload: errorMessage });
+      showStatus(errorMessage, "error", 5000);
     } finally {
-        dispatch({ type: 'SET_LOADING', payload: false });
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
@@ -543,7 +559,7 @@ const App = () => {
   const handleNewPrompt = () => {
     dispatch({ type: 'SELECT_PROMPT', payload: null });
     dispatch({ type: 'SET_PROMPT_NAME', payload: "Untitled Prompt" });
-    dispatch({ type: 'SET_PROMPT_TEMPLate', payload: "Your new prompt template with a {{variable}} here." });
+    dispatch({ type: 'SET_PROMPT_TEMPLATE', payload: "Your new prompt template with a {{variable}} here." });
     dispatch({ type: 'SET_API_RESPONSE', payload: '' });
     dispatch({ type: 'CLEAR_HISTORY' });
     showStatus("Started a new prompt.", "info");
@@ -693,8 +709,17 @@ const App = () => {
                   <div className="flex items-center justify-center h-full text-gray-400"><Spinner /> <span className="ml-2">Waiting for response...</span></div>
                 ) : apiResponse ? (
                     <>
-                        <p className="whitespace-pre-wrap">{apiResponse}</p>
-                        <PromptRating prompt={finalPrompt} source={provider} />
+                      <div className="whitespace-pre-wrap">
+                        {apiResponse.split('\n').map((line, i) => {
+                          if (line.startsWith('### ')) {
+                            return <h3 key={i} className="text-lg font-bold text-indigo-300 mt-4 mb-2">{line.replace('### ', '')}</h3>;
+                          } else if (line.startsWith('**')) {
+                            return <h4 key={i} className="font-semibold text-white mt-3 mb-1">{line.replace(/\*\*/g, '')}</h4>;
+                          }
+                          return <p key={i} className="mb-2">{line}</p>;
+                        })}
+                      </div>
+                      <PromptRating prompt={finalPrompt} source={provider} />
                     </>
                 ) : (
                   <p className="text-gray-500 flex items-center justify-center h-full">The AI's response will appear here.</p>
