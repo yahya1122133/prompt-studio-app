@@ -93,6 +93,43 @@
     @apply absolute inset-0 bg-gradient-to-r from-transparent via-gray-700/30 to-transparent;
     animation: shimmer 2s infinite;
   }
+
+  /* FIXED: Custom prose styles without @apply prose */
+  .prose-invert {
+    color: #e2e8f0; /* gray-200 */
+    max-width: none;
+    font-size: 0.875rem; /* prose-sm */
+  }
+  
+  .prose-invert h1,
+  .prose-invert h2,
+  .prose-invert h3,
+  .prose-invert h4 {
+    color: white;
+  }
+  
+  .prose-invert p {
+    margin-bottom: 0.5rem;
+  }
+  
+  .prose-invert a {
+    color: #818cf8; /* indigo-400 */
+  }
+  
+  .prose-invert code {
+    color: white;
+    background: #1e293b; /* gray-800 */
+    padding: 0.2rem 0.4rem;
+    border-radius: 0.25rem;
+  }
+  
+  .prose-invert pre {
+    color: #e2e8f0;
+    background: #0f172a; /* gray-900 */
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+  }
 }
 
 @keyframes fadeIn {
@@ -110,23 +147,4 @@
   100% { transform: translateX(100%); }
 }
 
-/* For prose content in API responses */
-.prose-invert {
-  @apply prose prose-sm max-w-none;
-  --tw-prose-body: theme('colors.gray.200');
-  --tw-prose-headings: theme('colors.white');
-  --tw-prose-lead: theme('colors.gray.400');
-  --tw-prose-links: theme('colors.indigo.400');
-  --tw-prose-bold: theme('colors.white');
-  --tw-prose-counters: theme('colors.gray.400');
-  --tw-prose-bullets: theme('colors.gray.600');
-  --tw-prose-hr: theme('colors.gray.700');
-  --tw-prose-quotes: theme('colors.gray.200');
-  --tw-prose-quote-borders: theme('colors.gray.700');
-  --tw-prose-captions: theme('colors.gray.400');
-  --tw-prose-code: theme('colors.white');
-  --tw-prose-pre-code: theme('colors.gray.200');
-  --tw-prose-pre-bg: theme('colors.gray.900');
-  --tw-prose-th-borders: theme('colors.gray.600');
-  --tw-prose-td-borders: theme('colors.gray.700');
-}
+/* REMOVED: Problematic prose class application */
