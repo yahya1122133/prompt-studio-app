@@ -1,16 +1,9 @@
 [build]
   command = "npm run build"
   publish = "build"
-  functions = "functions"
-  edge_handlers = "edge-handlers"
-  processing = { css = { bundle = true, minify = true }, html = { pretty_urls = true }, images = { compress = true }, js = { bundle = true, minify = true } }
-  prerender = true
 
 [[plugins]]
   package = "@netlify/plugin-sitemap"
 
 [build.environment]
   NODE_VERSION = "18"
-  
-[context.production.environment]
-  SITEMAP_URL = "https://promptmakers.netlify.app/sitemap.xml"
