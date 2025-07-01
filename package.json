@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@google/generative-ai": "^0.1.0",
+    "@netlify/plugin-sitemap": "^0.8.1",
     "@testing-library/react": "^13.4.0",
     "core-js": "^3.43.0",
     "lucide-react": "^0.378.0",

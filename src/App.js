@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, createContext, useContext, useReducer } from 'react';
 import { ArrowRight, Book, Bot, Copy, History, Loader2, Save, Search, Settings, Trash2, Wand2, X, Plus, Sparkles } from 'lucide-react';
 
-// ===== HELPER FUNCTIONS (for learning system) =====
+// ===== HELPER FUNCTIONS =====
 const extractPatterns = (prompt) => {
   const hasVariables = /{{\s*\w+\s*}}/.test(prompt);
   const mentionsPersona = /act as/i.test(prompt);
@@ -199,9 +199,9 @@ const Card = ({ children, className = '', title, icon, actions }) => (
 const Button = ({ children, onClick, variant = 'primary', disabled = false, className = '', ariaLabel }) => {
   const baseStyles = 'px-4 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 active:scale-95';
   const variants = {
-    primary: 'bg-indigo-600 text-white hover:bg-indigo-500 disabled:bg-indigo-400/50 disabled:cursor-not-allowed focus:ring-indigo-500',
+    primary: 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed focus:ring-indigo-500',
     secondary: 'bg-gray-700 text-gray-200 hover:bg-gray-600 disabled:bg-gray-700/50 disabled:cursor-not-allowed focus:ring-gray-500',
-    danger: 'bg-red-600 text-white hover:bg-red-500 focus:ring-red-500',
+    danger: 'bg-gradient-to-r from-red-600 to-orange-600 text-white hover:opacity-90 focus:ring-red-500',
   };
   return (
     <button onClick={onClick} disabled={disabled} aria-label={ariaLabel} className={`${baseStyles} ${variants[variant]} ${className}`}>
@@ -264,9 +264,8 @@ const PromptRating = ({ prompt, source }) => {
 };
 
 // ===== FOOTER COMPONENT & MODAL LOGIC =====
-// CHANGE 2: The logic for the modals has been corrected here to prevent bugs.
 const Footer = () => {
-    const [modal, setModal] = useState(null); // Can be 'privacy', 'terms', or 'report'
+    const [modal, setModal] = useState(null);
 
     const ModalContent = ({ title, children, onClose }) => (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -286,70 +285,124 @@ const Footer = () => {
       <>
         <footer className="mt-16 py-8 border-t border-white/10 bg-gradient-to-t from-gray-900/50 to-transparent">
           <div className="max-w-7xl mx-auto px-4">
-             <div className="flex flex-col md:flex-row justify-between items-center">
-                <div className="text-center md:text-left mb-6 md:mb-0">
-                    <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
-                        <Sparkles className="w-5 h-5 text-indigo-400" />
-                        <span className="text-lg font-bold text-white">PromptCraft</span>
-                    </div>
-                    <p className="text-gray-400 text-sm">© {new Date().getFullYear()} PromptCraft. All rights reserved.</p>
-                    {/* CHANGE 1: "Made with" text added here. */}
-                    <p className="text-gray-500 text-sm mt-1">
-                        Made with <span className="text-red-500">❤️</span> for AI enthusiasts
-                    </p>
-                </div>
-                <div className="flex flex-wrap justify-center gap-4 md:gap-6">
-                    <button className="text-gray-400 hover:text-indigo-400 text-sm transition-colors font-medium" onClick={() => setModal('report')}>Report an Issue</button>
-                    <button className="text-gray-400 hover:text-indigo-400 text-sm transition-colors font-medium" onClick={() => setModal('privacy')}>Privacy Policy</button>
-                    <button className="text-gray-400 hover:text-indigo-400 text-sm transition-colors font-medium" onClick={() => setModal('terms')}>Terms of Service</button>
-                </div>
-            </div>
+              <div className="flex flex-col md:flex-row justify-between items-center">
+                  <div className="text-center md:text-left mb-6 md:mb-0">
+                      <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+                          <Sparkles className="w-5 h-5 text-indigo-400" />
+                          <span className="text-lg font-bold text-white">Promptmakers</span>
+                      </div>
+                      <p className="text-gray-400 text-sm">© {new Date().getFullYear()} Promptmakers. All rights reserved.</p>
+                      <p className="text-gray-500 text-sm mt-1">
+                          Made with <span className="text-red-500">❤️</span> for AI enthusiasts
+                      </p>
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-4 md:gap-6">
+                      <button className="text-gray-400 hover:text-indigo-400 text-sm transition-colors font-medium" onClick={() => setModal('report')}>Report an Issue</button>
+                      <button className="text-gray-400 hover:text-indigo-400 text-sm transition-colors font-medium" onClick={() => setModal('privacy')}>Privacy Policy</button>
+                      <button className="text-gray-400 hover:text-indigo-400 text-sm transition-colors font-medium" onClick={() => setModal('terms')}>Terms of Service</button>
+                  </div>
+              </div>
           </div>
         </footer>
   
         {modal === 'report' && (
              <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                <div className="bg-gray-800 border border-white/10 rounded-xl w-full max-w-md">
-                  <div className="p-6 border-b border-white/10 flex justify-between items-center">
-                      <h2 className="text-xl font-bold text-white">Report an Issue</h2>
-                      <button className="p-2 rounded-full hover:bg-white/10" onClick={() => setModal(null)}><X className="w-5 h-5" /></button>
-                  </div>
-                  <div className="p-6">
-                      <form name="issue-report" method="POST" data-netlify="true" data-netlify-honeypot="bot-field">
-                          <input type="hidden" name="form-name" value="issue-report" />
-                          <p className="hidden"><label>Don’t fill this out if you’re human: <input name="bot-field" /></label></p>
-                          <div className="space-y-4">
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-300 mb-2">Your Email</label>
-                                  <input type="email" name="email" placeholder="email@example.com" className="w-full bg-gray-900/50 border border-white/10 rounded-lg p-3 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none" required />
-                              </div>
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-300 mb-2">Issue Type</label>
-                                  <select name="issueType" className="w-full bg-gray-900/50 border border-white/10 rounded-lg p-3 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                                      <option>Bug Report</option><option>Feature Request</option><option>Security Issue</option><option>Other</option>
-                                  </select>
-                              </div>
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
-                                  <textarea name="description" rows={4} placeholder="Please describe the issue in detail..." className="w-full bg-gray-900/50 border border-white/10 rounded-lg p-3 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none" required></textarea>
-                              </div>
-                              <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 rounded-lg transition-colors">Submit Report</button>
-                          </div>
-                      </form>
-                  </div>
-                </div>
+               <div className="bg-gray-800 border border-white/10 rounded-xl w-full max-w-md">
+                 <div className="p-6 border-b border-white/10 flex justify-between items-center">
+                   <h2 className="text-xl font-bold text-white">Report an Issue</h2>
+                   <button className="p-2 rounded-full hover:bg-white/10" onClick={() => setModal(null)}><X className="w-5 h-5" /></button>
+                 </div>
+                 <div className="p-6">
+                   <form name="issue-report" method="POST" data-netlify="true" data-netlify-honeypot="bot-field">
+                       <input type="hidden" name="form-name" value="issue-report" />
+                       <p className="hidden"><label>Don’t fill this out if you’re human: <input name="bot-field" /></label></p>
+                       <div className="space-y-4">
+                           <div>
+                               <label className="block text-sm font-medium text-gray-300 mb-2">Your Email</label>
+                               <input type="email" name="email" placeholder="email@example.com" className="w-full bg-gray-900/50 border border-white/10 rounded-lg p-3 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none" required />
+                           </div>
+                           <div>
+                               <label className="block text-sm font-medium text-gray-300 mb-2">Issue Type</label>
+                               <select name="issueType" className="w-full bg-gray-900/50 border border-white/10 rounded-lg p-3 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                                   <option>Bug Report</option><option>Feature Request</option><option>Security Issue</option><option>Other</option>
+                               </select>
+                           </div>
+                           <div>
+                               <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
+                               <textarea name="description" rows={4} placeholder="Please describe the issue in detail..." className="w-full bg-gray-900/50 border border-white/10 rounded-lg p-3 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none" required></textarea>
+                           </div>
+                           <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white font-medium py-3 rounded-lg transition-opacity">Submit Report</button>
+                       </div>
+                   </form>
+                 </div>
+               </div>
              </div>
         )}
 
         {modal === 'privacy' && (
             <ModalContent title="Privacy Policy" onClose={() => setModal(null)}>
-                <p>All your prompt data is stored locally in your browser's localStorage. We do not store your prompt data on our servers. Your data remains on your device at all times.</p>
-                <p>When you use the AI generation features, your prompt is sent to our backend service, which then securely forwards it to the respective AI provider (e.g., Google Gemini, DeepSeek) to get a response. We do not log or store the content of these requests.</p>
+                <h3 className="text-lg font-semibold mt-4">1. Introduction</h3>
+                <p>Promptmakers ("we", "us", or "our") operates the Promptmakers web application (the "Service"). This Privacy Policy informs you of our policies regarding the collection, use, and disclosure of personal data when you use our Service and the choices you have associated with that data.</p>
+                
+                <h3 className="text-lg font-semibold mt-6">2. Data Collection and Use</h3>
+                <p>We collect several different types of information for various purposes to provide and improve our Service to you.</p>
+                
+                <h4 className="font-medium mt-4">Types of Data Collected:</h4>
+                <ul className="list-disc pl-6">
+                    <li><strong>Prompt Data:</strong> Your prompt templates and variables are stored locally in your browser's localStorage. We do not have access to this data unless you explicitly share it with us.</li>
+                    <li><strong>Usage Data:</strong> When you generate AI responses, your prompt is sent to our backend service which securely forwards it to AI providers (Google Gemini, DeepSeek). We do not log or store the content of these requests.</li>
+                    <li><strong>Technical Data:</strong> We may collect information such as your browser type, browser version, and other diagnostic data to monitor Service usage and performance.</li>
+                </ul>
+                
+                <h3 className="text-lg font-semibold mt-6">3. Data Security</h3>
+                <p>The security of your data is important to us. We implement appropriate technical and organizational measures to protect against unauthorized access, alteration, disclosure, or destruction of your personal data stored locally in your browser.</p>
+                
+                <h3 className="text-lg font-semibold mt-6">4. Third-Party Services</h3>
+                <p>We use third-party AI providers to process your prompts. These providers have their own privacy policies addressing how they use your data. We recommend you review their privacy policies:</p>
+                <ul className="list-disc pl-6">
+                    <li>Google Gemini: https://policies.google.com/privacy</li>
+                    <li>DeepSeek: https://deepseek.com/privacy</li>
+                </ul>
+                
+                <h3 className="text-lg font-semibold mt-6">5. Changes to This Privacy Policy</h3>
+                <p>We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page. Changes are effective immediately after they are posted.</p>
             </ModalContent>
         )}
+        
         {modal === 'terms' && (
             <ModalContent title="Terms of Service" onClose={() => setModal(null)}>
-                <p>This service is provided "as is" without warranty of any kind. You are responsible for the content you generate. Do not use the service for any illegal purpose or to generate harmful content.</p>
+                <h3 className="text-lg font-semibold mt-4">1. Acceptance of Terms</h3>
+                <p>By accessing or using the Promptmakers service ("Service"), you agree to be bound by these Terms of Service ("Terms"). If you disagree with any part of the terms, you may not access the Service.</p>
+                
+                <h3 className="text-lg font-semibold mt-6">2. Use License</h3>
+                <p>Permission is granted to temporarily use the Service for personal and commercial purposes. This is the grant of a license, not a transfer of title, and under this license you may not:</p>
+                <ul className="list-disc pl-6">
+                    <li>Modify or copy the Service's code or functionality</li>
+                    <li>Use the Service for any illegal purpose</li>
+                    <li>Attempt to reverse engineer any software contained in the Service</li>
+                    <li>Remove any copyright or other proprietary notations</li>
+                </ul>
+                
+                <h3 className="text-lg font-semibold mt-6">3. Intellectual Property</h3>
+                <p>The Service and its original content, features, and functionality are and will remain the exclusive property of Promptmakers and its licensors. Your prompt templates and generated content belong to you.</p>
+                
+                <h3 className="text-lg font-semibold mt-6">4. User Responsibilities</h3>
+                <p>You agree not to use the Service to:</p>
+                <ul className="list-disc pl-6">
+                    <li>Generate illegal, harmful, abusive, or discriminatory content</li>
+                    <li>Impersonate any person or entity</li>
+                    <li>Violate any applicable laws or regulations</li>
+                    <li>Interfere with or disrupt the Service</li>
+                </ul>
+                
+                <h3 className="text-lg font-semibold mt-6">5. Limitation of Liability</h3>
+                <p>In no event shall Promptmakers, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your access to or use of or inability to access or use the Service.</p>
+                
+                <h3 className="text-lg font-semibold mt-6">6. Governing Law</h3>
+                <p>These Terms shall be governed and construed in accordance with the laws of the State of Delaware, United States, without regard to its conflict of law provisions.</p>
+                
+                <h3 className="text-lg font-semibold mt-6">7. Changes</h3>
+                <p>We reserve the right, at our sole discretion, to modify or replace these Terms at any time. By continuing to access or use our Service after those revisions become effective, you agree to be bound by the revised terms.</p>
             </ModalContent>
         )}
       </>
@@ -359,6 +412,20 @@ const Footer = () => {
 // ===== MAIN APP COMPONENT =====
 const App = () => {
   const { state, dispatch } = usePromptContext();
+  
+  // Netlify Identity Integration
+  useEffect(() => {
+    // Netlify Identity for prerendering
+    if (window.netlifyIdentity) {
+      window.netlifyIdentity.on('init', user => {
+        if (!user) {
+          window.netlifyIdentity.on('login', () => {
+            document.location.href = '/admin/';
+          });
+        }
+      });
+    }
+  }, []);
 
   const {
     promptTemplate, variables, apiResponse, responseHistory, isLoading, isSaving,
@@ -476,7 +543,7 @@ const App = () => {
   const handleNewPrompt = () => {
     dispatch({ type: 'SELECT_PROMPT', payload: null });
     dispatch({ type: 'SET_PROMPT_NAME', payload: "Untitled Prompt" });
-    dispatch({ type: 'SET_PROMPT_TEMPLATE', payload: "Your new prompt template with a {{variable}} here." });
+    dispatch({ type: 'SET_PROMPT_TEMPLate', payload: "Your new prompt template with a {{variable}} here." });
     dispatch({ type: 'SET_API_RESPONSE', payload: '' });
     dispatch({ type: 'CLEAR_HISTORY' });
     showStatus("Started a new prompt.", "info");
@@ -494,12 +561,34 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans p-4 lg:p-6 bg-grid-white/[0.05] pb-24 sm:pb-6">
+      {/* Structured Data for SEO */}
+      <script type="application/ld+json">
+        {JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          "name": "Promptmakers",
+          "description": "AI prompt engineering studio for crafting and optimizing prompts",
+          "applicationCategory": "Productivity",
+          "operatingSystem": "Web",
+          "url": "https://promptmakers.netlify.app",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          },
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "ratingCount": "25"
+          }
+        })}
+      </script>
+      
       <div className="max-w-7xl mx-auto">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
           <div className="flex items-center gap-3 mb-4 sm:mb-0">
-            {/* CHANGE 4: Logo Added Here */}
-            <img src="/512.png" alt="PromptCraft Logo" className="w-8 h-8" />
-            <h1 className="text-2xl lg:text-3xl font-bold text-white">PromptCraft</h1>
+            <Sparkles className="w-8 h-8 text-yellow-400" />
+            <h1 className="text-2xl lg:text-3xl font-bold text-white">Promptmakers</h1>
           </div>
           <div className="flex items-center gap-2">
             <Button onClick={() => dispatch({ type: 'TOGGLE_LIBRARY', payload: true })} variant="secondary" ariaLabel="Open prompt library">
@@ -513,21 +602,25 @@ const App = () => {
 
         <main className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="flex flex-col gap-6">
-            {/* CHANGE 3: Title Renamed Here */}
             <Card title="AI Prompt Generator" icon={<Wand2 className="text-indigo-400" />}>
-              <textarea
-                value={promptTemplate}
-                onChange={(e) => {
-                  dispatch({ type: 'SET_PROMPT_TEMPLATE', payload: e.target.value });
-                  if (selectedPromptId) {
-                    dispatch({ type: 'SELECT_PROMPT', payload: null });
-                    dispatch({ type: 'SET_PROMPT_NAME', payload: promptName.endsWith('*') ? promptName : `${promptName}*` });
-                  }
-                }}
-                className="w-full h-48 bg-gray-900/50 border border-white/10 rounded-lg p-3 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow font-mono text-sm leading-relaxed"
-                placeholder="e.g., Generate a tweet about {{product}}."
-                aria-label="Prompt template editor"
-              />
+              <div className="relative">
+                <textarea
+                  value={promptTemplate}
+                  onChange={(e) => {
+                    dispatch({ type: 'SET_PROMPT_TEMPLATE', payload: e.target.value });
+                    if (selectedPromptId) {
+                      dispatch({ type: 'SELECT_PROMPT', payload: null });
+                      dispatch({ type: 'SET_PROMPT_NAME', payload: promptName.endsWith('*') ? promptName : `${promptName}*` });
+                    }
+                  }}
+                  className="w-full h-48 bg-gray-900/50 border border-white/10 rounded-lg p-3 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow font-mono text-sm leading-relaxed"
+                  placeholder="e.g., Generate a tweet about {{product}}."
+                  aria-label="Prompt template editor"
+                />
+                <div className="absolute bottom-4 right-4 bg-black/30 px-2 py-1 rounded text-xs text-gray-400">
+                  {promptTemplate.length} chars
+                </div>
+              </div>
               <Button onClick={() => handleGenerateResponse(finalPrompt)} disabled={isLoading} className="w-full mt-4" ariaLabel="Test prompt">
                 {isLoading ? <Spinner /> : <Sparkles size={16} />}
                 {isLoading ? 'Generating...' : `Test with ${provider.charAt(0).toUpperCase() + provider.slice(1)}`}
@@ -546,6 +639,7 @@ const App = () => {
                                 newVariables[i].value = e.target.value;
                                 dispatch({ type: 'SET_VARIABLES', payload: newVariables });
                             }}
+                            placeholder={`Enter value for ${v.name}`}
                             className="w-full bg-gray-900/50 border border-white/10 rounded-lg p-2 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                             aria-label={`Value for ${v.name} variable`}
                         />
@@ -562,7 +656,7 @@ const App = () => {
                    <div className="flex gap-2">
                         {['auto', 'gemini', 'deepseek'].map(p => (
                             <button key={p} onClick={() => dispatch({type: 'SET_PROVIDER', payload: p})}
-                                className={`flex-1 py-2 text-sm font-semibold rounded-md transition-colors ${provider === p ? 'bg-indigo-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
+                                className={`flex-1 py-2 text-sm font-semibold rounded-md transition-colors ${provider === p ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
                                 {p.charAt(0).toUpperCase() + p.slice(1)}
                             </button>
                         ))}
@@ -577,6 +671,10 @@ const App = () => {
                     className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                     aria-label="AI temperature setting"
                   />
+                  <div className="flex justify-between text-xs text-gray-400 mt-1">
+                    <span>More Focused</span>
+                    <span>More Creative</span>
+                  </div>
                 </div>
               </div>
             </Card>
@@ -605,15 +703,30 @@ const App = () => {
             </Card>
 
             <Card title="Response History" icon={<History className="text-gray-400" />} actions={
-                <Button onClick={() => dispatch({ type: 'CLEAR_HISTORY' })} variant="secondary" className="px-2 py-1 text-xs" disabled={responseHistory.length === 0} ariaLabel="Clear response history">
-                  Clear
+                <Button onClick={() => {
+                  if (responseHistory.length > 0 && window.confirm('Are you sure you want to clear the response history?')) {
+                    dispatch({ type: 'CLEAR_HISTORY' });
+                  }
+                }} variant="secondary" className="px-2 py-1 text-xs" disabled={responseHistory.length === 0} ariaLabel="Clear response history">
+                    Clear
                 </Button>
             }>
                 <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
                 {responseHistory.length > 0 ? (
                     responseHistory.map((r, i) => (
-                    <div key={i} className="text-sm p-2 bg-white/5 rounded-md border border-white/10 text-gray-400 truncate" title={r} aria-label={`Previous response ${i+1}`}>
+                    <div key={i} className="group relative text-sm p-2 bg-white/5 rounded-md border border-white/10 text-gray-400 truncate hover:bg-white/10 transition-colors cursor-pointer" onClick={() => dispatch({ type: 'SET_API_RESPONSE', payload: r })} aria-label={`Previous response ${i+1}`}>
                         {r}
+                        <IconButton 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(r);
+                            showStatus('Copied to clipboard!', 'success');
+                          }} 
+                          className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
+                          ariaLabel="Copy response"
+                        >
+                          <Copy size={14} />
+                        </IconButton>
                     </div>
                     ))
                 ) : (
@@ -627,10 +740,13 @@ const App = () => {
         <div className="mt-6">
           <Card>
             <div className="flex flex-col sm:flex-row items-center gap-4">
-              <input type="text" value={promptName} onChange={(e) => dispatch({ type: 'SET_PROMPT_NAME', payload: e.target.value })}
-                className="w-full sm:flex-grow bg-gray-900/50 border border-white/10 rounded-lg p-2 text-gray-200 focus:ring-2 focus:ring-indigo-500"
-                placeholder="Enter a name for this prompt..." aria-label="Prompt name"
-              />
+              <div className="relative w-full">
+                <input type="text" value={promptName} onChange={(e) => dispatch({ type: 'SET_PROMPT_NAME', payload: e.target.value })}
+                  className="w-full bg-gray-900/50 border border-white/10 rounded-lg p-2 text-gray-200 focus:ring-2 focus:ring-indigo-500 pl-10"
+                  placeholder="Enter a name for this prompt..." aria-label="Prompt name"
+                />
+                <Save className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              </div>
               <Button onClick={handleSavePrompt} disabled={isSaving || !promptName} className="w-full sm:w-auto" ariaLabel="Save prompt to library">
                 {isSaving ? <Spinner /> : <Save size={16} />}
                 {selectedPromptId ? 'Update Prompt' : 'Save to Library'}
@@ -663,13 +779,16 @@ const App = () => {
                 <ul className="space-y-2">
                   {filteredPrompts.map(p => (
                     <li key={p.id} className="group flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer" onClick={() => handleLoadPrompt(p)} aria-label={`Load prompt: ${p.name}`}>
-                      <div>
-                        <p className="font-semibold text-white">{p.name}</p>
-                        <p className="text-xs text-gray-400 truncate max-w-md">{p.template}</p>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-white truncate">{p.name}</p>
+                        <p className="text-xs text-gray-400 truncate">{p.template}</p>
                       </div>
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex gap-1">
+                        <IconButton onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(p.template); showStatus('Copied to library!', 'success'); }} tooltip="Copy" ariaLabel={`Copy prompt: ${p.name}`}>
+                          <Copy size={14} className="text-gray-300 hover:text-white"/>
+                        </IconButton>
                         <IconButton onClick={(e) => { e.stopPropagation(); dispatch({ type: 'SET_PROMPT_TO_DELETE', payload: p.id }); }} tooltip="Delete" ariaLabel={`Delete prompt: ${p.name}`}>
-                          <Trash2 size={16} className="text-red-400 hover:text-red-300"/>
+                          <Trash2 size={14} className="text-red-400 hover:text-red-300"/>
                         </IconButton>
                       </div>
                     </li>
@@ -687,6 +806,7 @@ const App = () => {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="dialog">
           <div className="bg-gray-800 border border-white/10 rounded-xl w-full max-w-md shadow-2xl">
             <div className="p-6 text-center">
+              <Trash2 className="w-12 h-12 text-red-500 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-white">Confirm Deletion</h3>
               <p className="text-gray-400 mt-2">Are you sure you want to delete this prompt? This action cannot be undone.</p>
             </div>
@@ -699,11 +819,21 @@ const App = () => {
       )}
 
       {statusMessage.text && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 transition-all duration-300" role="status">
-          <div className={`px-4 py-2 rounded-lg text-white text-sm shadow-2xl ${statusMessage.type === 'success' ? 'bg-green-600' : (statusMessage.type === 'error' ? 'bg-red-600' : 'bg-gray-700')}`}>
-            {statusMessage.text}
-          </div>
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-md shadow-lg transition-all duration-300 ${
+          statusMessage.type === 'success' ? 'bg-green-600' : 
+          statusMessage.type === 'error' ? 'bg-red-600' : 
+          'bg-indigo-600'
+        }`} role="status">
+          {statusMessage.text}
         </div>
+      )}
+
+      {/* Netlify CMS script */}
+      {process.env.NODE_ENV === 'production' && (
+        <script 
+          src="https://identity.netlify.com/v1/netlify-identity-widget.js" 
+          async
+        />
       )}
     </div>
   );

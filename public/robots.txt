@@ -1,3 +1,11 @@
-# https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /api
+
+# Netlify-specific paths to avoid
+Disallow: /cdn-cgi/
+
+# Sitemap for Netlify deployment
+Sitemap: https://promptmakers.netlify.app/sitemap.xml
