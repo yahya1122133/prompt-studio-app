@@ -26,8 +26,8 @@
 
 [[plugins]]
   package = "@netlify/plugin-lighthouse"
-  enabled = false
+  # enabled = false # This plugin is disabled
 
 [[plugins]]
   package = "@netlify/plugin-emails"
-  enabled = false
+  # enabled = false # This plugin is disabled
