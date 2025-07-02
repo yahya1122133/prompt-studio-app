@@ -1,15 +1,18 @@
 [build]
-  command = "npm install --legacy-peer-deps && npm run build"
+  command = "npm ci --legacy-peer-deps && npm run build"
   publish = "build"
   functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "18"
-  NPM_FLAGS = "--legacy-peer-deps"
+  CI = "true"  # Enables build optimizations and caching
 
 [functions]
   node_bundler = "esbuild"
   timeout = 30
+  # Uncomment for larger functions:
+  # node_bundler = "esbuild"
+  # timeout = 10  # Max is 10s for free tier
 
 [[headers]]
   for = "/*"
@@ -18,16 +21,28 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://identity.netlify.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://api.deepseek.com; frame-src 'self'"
+    # Consider adding for better security:
+    # Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    # Permissions-Policy = "geolocation=(), microphone=(), camera=()"
 
+# For Single Page Applications (React, Vue, etc.)
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-[[plugins]]
-  package = "@netlify/plugin-lighthouse"
-  # enabled = false # This plugin is disabled
+# For faster navigation between pages (optional)
+[[redirects]]
+  from = "/app/*"
+  to = "/app/index.html"
+  status = 200
 
-[[plugins]]
-  package = "@netlify/plugin-emails"
-  # enabled = false # This plugin is disabled
+# Uncomment if using Netlify Forms
+# [[headers]]
+#   for = "/success"
+#   [headers.values]
+#     Cache-Control = "no-cache, no-store"
+
+# Uncomment for image optimization
+# [[plugins]]
+#   package = "@netlify/plugin-nextjs"
