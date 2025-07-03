@@ -5,11 +5,12 @@
   "dependencies": {
     "@google/generative-ai": "^0.1.3",
     "@netlify/plugin-sitemap": "^0.8.1",
+    "@testing-library/react": "^13.4.0",
     "ajv": "8.12.0",
     "ajv-formats": "2.1.1",
     "ajv-keywords": "5.1.0",
-    "core-js": "3.43.0",
-    "glob": "^11.0.3",
+    "core-js": "^3.43.0",
+    "lambda-rate-limiter": "^4.0.2",
     "lucide-react": "^0.378.0",
     "node-fetch": "^3.3.2",
     "npm-force-resolutions": "^0.0.3",
@@ -17,26 +18,20 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-helmet-async": "^2.0.5",
-    "react-scripts": "5.0.1",
+    "react-scripts": "^0.0.0",
     "util": "^0.12.5",
     "web-vitals": "^2.1.4",
     "whatwg-fetch": "^3.6.20"
   },
   "resolutions": {
-    "core-js": "3.43.0",
-    "ajv": "8.12.0",
-    "ajv-keywords": "5.1.0",
-    "ajv-formats": "2.1.1"
+    "core-js": "3.43.0"
   },
   "scripts": {
     "preinstall": "npx npm-force-resolutions",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "test:netlify": "netlify build",
-    "test:headers": "node validate-headers.js",
-    "test:build": "set CI=true && npm ci --legacy-peer-deps && npm run build"
+    "eject": "react-scripts eject"
   },
   "eslintConfig": {
     "extends": [
@@ -57,12 +52,12 @@
     ]
   },
   "engines": {
-    "node": ">=20"
+    "node": "18.x"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^14.6.1",
-    "jest-environment-jsdom": "^30.0.2"
+    "jest-environment-jsdom": "^30.0.2",
+    "netlify-cli": "^22.2.1"
   }
 }
