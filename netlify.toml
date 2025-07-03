@@ -1,18 +1,15 @@
 [build]
   command = "npm ci --legacy-peer-deps && npm run build"
   publish = "build"
-  functions = "netlify/functions"
 
 [build.environment]
-  NODE_VERSION = "18"
-  CI = "true"  # Enables build optimizations and caching
+  NODE_VERSION = "20"
+  CI = "true"  # Set to "false" if you want to ignore warnings during build
 
 [functions]
   node_bundler = "esbuild"
-  timeout = 30
-  # Uncomment for larger functions:
-  # node_bundler = "esbuild"
-  # timeout = 10  # Max is 10s for free tier
+  [functions.timeout]
+    default = 10
 
 [[headers]]
   for = "/*"
@@ -21,28 +18,16 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://identity.netlify.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://api.deepseek.com; frame-src 'self'"
-    # Consider adding for better security:
     # Strict-Transport-Security = "max-age=31536000; includeSubDomains"
     # Permissions-Policy = "geolocation=(), microphone=(), camera=()"
 
-# For Single Page Applications (React, Vue, etc.)
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# For faster navigation between pages (optional)
-[[redirects]]
-  from = "/app/*"
-  to = "/app/index.html"
-  status = 200
-
-# Uncomment if using Netlify Forms
-# [[headers]]
-#   for = "/success"
-#   [headers.values]
-#     Cache-Control = "no-cache, no-store"
-
-# Uncomment for image optimization
-# [[plugins]]
-#   package = "@netlify/plugin-nextjs"
+# If you have a separate app in the /app subdirectory, uncomment the following:
+# [[redirects]]
+#   from = "/app/*"
+#   to = "/app/index.html"
+#   status = 200
