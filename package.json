@@ -48,7 +48,7 @@
     ]
   },
   "engines": {
-    "node": "18.x"
+    "node": "20.x"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",
