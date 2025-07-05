@@ -1,33 +1,90 @@
+# ==============================================================================
+# Netlify Configuration File
+# This file tells Netlify how to build, deploy, and serve your application.
+# ==============================================================================
+
+# Build settings for your React application
 [build]
-  command = "npm ci --legacy-peer-deps && npm run build"
+  # Command to build the site
+  command = "npm install && npm run build"
+  # The directory that contains the built site
   publish = "build"
+  # The directory where your serverless functions are located
+  functions = "netlify/functions"
 
 [build.environment]
+  # Specify the Node.js version to use for the build
   NODE_VERSION = "20"
-  CI = "true"  # Set to "false" if you want to ignore warnings during build
+  # A common flag for continuous integration environments
+  CI = "true"
+  # Helps resolve dependency conflicts during installation
+  NPM_FLAGS = "--legacy-peer-deps"
 
+# Serverless Functions configuration
 [functions]
+  # Use esbuild for faster function bundling
   node_bundler = "esbuild"
+  # Sets a default timeout for all functions, which we've optimized for
   [functions.timeout]
     default = 10
 
+# Asset processing settings to optimize your site
+[build.processing]
+  skip_processing = false
+[build.processing.css]
+  bundle = true
+  minify = true
+[build.processing.js]
+  bundle = true
+  minify = true
+[build.processing.html]
+  pretty_urls = true
+
+# Netlify plugins to add extra functionality
+[[plugins]]
+  # Automatically generates a sitemap for your site
+  package = "@netlify/plugin-sitemap"
+
+# ==============================================================================
+# HTTP Headers
+# These rules enhance your site's security and performance.
+# ==============================================================================
+
+# Security headers applied to all pages
 [[headers]]
   for = "/*"
   [headers.values]
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
+    # Content Security Policy to lock down resource loading
     Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://identity.netlify.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://api.deepseek.com; frame-src 'self'"
-    # Strict-Transport-Security = "max-age=31536000; includeSubDomains"
-    # Permissions-Policy = "geolocation=(), microphone=(), camera=()"
 
+# Caching headers for static assets (like JS, CSS, images)
+[[headers]]
+  for = "/static/*"
+  [headers.values]
+    # Tell browsers to cache these files for one year
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# ==============================================================================
+# Redirects and Rewrites
+# The order of these rules is critical.
+# ==============================================================================
+
+# CRITICAL: This rule proxies requests from /api/* to your serverless function.
+# This must come BEFORE the Single-Page App (SPA) rule.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# This is the standard rule for a Single-Page Application (like React).
+# It ensures that any direct navigation to a route (e.g., /about)
+# serves your main index.html file, allowing React Router to take over.
+# This must be the LAST redirect rule.
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-
-# If you have a separate app in the /app subdirectory, uncomment the following:
-# [[redirects]]
-#   from = "/app/*"
-#   to = "/app/index.html"
-#   status = 200
