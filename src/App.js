@@ -42,7 +42,7 @@ const learnFromSuccess = (learningState, prompt) => {
 const initialState = {
   promptTemplate: 'Generate a creative tweet about {{product}}.',
   variables: [],
-  apiResponse: '',
+  apiResponse: null, // Changed to null for clearer initial state
   responseHistory: [],
   isLoading: false,
   isSaving: false,
@@ -77,7 +77,7 @@ const promptReducer = (state, action) => {
       return { ...state, apiResponse: action.payload };
     case 'ADD_TO_HISTORY':
         const newHistory = [action.payload, ...state.responseHistory];
-        const uniqueHistory = newHistory.filter((item, index) => item && newHistory.indexOf(item) === index);
+        const uniqueHistory = newHistory.filter((item, index) => item && newHistory.findIndex(h => h.text === item.text) === index);
         return { ...state, responseHistory: uniqueHistory.slice(0, 10) };
     case 'CLEAR_HISTORY':
         return {...state, responseHistory: [] };
@@ -451,35 +451,36 @@ const App = () => {
     selectedPromptId, promptName, showLibrary, promptToDelete, statusMessage
   } = state;
 
-  const [apiResult, setApiResult] = useState(null);
-
   const showStatus = (text, type = 'info', duration = 3000) => {
     const id = Date.now();
     dispatch({ type: 'SET_STATUS', payload: { text, type, id } });
     const timer = setTimeout(() => {
-        dispatch(currentState => {
-            if (currentState.statusMessage.id === id) {
-                return { type: 'SET_STATUS', payload: { text: '', type: '', id: 0 } };
-            }
-            return currentState;
+        dispatch({ type: 'SET_STATUS', payload: (currentState) => 
+            currentState.statusMessage.id === id ? { text: '', type: '', id: 0 } : currentState.statusMessage
         });
     }, duration);
     return () => clearTimeout(timer);
   };
 
+  // FIXED: Added 'variables' to the dependency array and a guard clause to prevent infinite loops.
   useEffect(() => {
     const regex = /{{\s*(\w+)\s*}}/g;
     const matches = promptTemplate.match(regex) || [];
     const uniqueVars = [...new Set(matches.map(v => v.replace(/{{\s*|\s*}}/g, '')))];
     
-    dispatch({
-      type: 'SET_VARIABLES',
-      payload: uniqueVars.map(name => {
+    const newVariables = uniqueVars.map(name => {
         const existingVar = variables.find(v => v.name === name);
         return existingVar || { name, value: '' };
-      })
     });
-  }, [promptTemplate, dispatch]);
+
+    // Prevents dispatching if the variable structure hasn't changed, avoiding a loop.
+    if (JSON.stringify(newVariables) !== JSON.stringify(variables)) {
+        dispatch({
+          type: 'SET_VARIABLES',
+          payload: newVariables
+        });
+    }
+  }, [promptTemplate, dispatch, variables]);
 
   useEffect(() => {
     const filtered = savedPrompts.filter(p =>
@@ -498,14 +499,13 @@ const App = () => {
   
   const handleGenerateResponse = async (promptToGenerate, providerOverride) => {
     dispatch({ type: 'SET_LOADING', payload: true });
-    setApiResult(null);
+    // FIXED: Use dispatch to clear the previous response from global state
+    dispatch({ type: 'SET_API_RESPONSE', payload: null });
     showStatus("Generating response...", "info", 5000);
     
     try {
-      // FIXED: Construct a full URL for the fetch call to prevent parsing errors.
-      const apiEndpoint = process.env.NODE_ENV === 'production'
-        ? 'https://promptmakers.app/api/ai-proxy'
-        : 'http://localhost:8888/api/ai-proxy';
+      // Use the new, cleaner proxy path
+      const apiEndpoint = '/api/ai-proxy';
 
       const response = await fetch(apiEndpoint, {
         method: 'POST',
@@ -523,7 +523,8 @@ const App = () => {
         throw new Error(data.error?.message || 'An unknown error occurred.');
       }
       
-      setApiResult(data);
+      // FIXED: Use dispatch to set the new response in global state
+      dispatch({ type: 'SET_API_RESPONSE', payload: data });
       dispatch({ type: 'ADD_TO_HISTORY', payload: data });
       showStatus(`Success! (from ${data.provider})`, "success");
       dispatch({ type: 'LEARN_FROM_SUCCESS', payload: promptToGenerate });
@@ -531,7 +532,8 @@ const App = () => {
     } catch (error) {
       console.error('API Error:', error);
       const errorMessage = `Error: ${error.message}`;
-      setApiResult({ text: errorMessage, error: true });
+      // FIXED: Use dispatch to set the error response in global state
+      dispatch({ type: 'SET_API_RESPONSE', payload: { text: errorMessage, error: true } });
       showStatus(errorMessage, "error", 5000);
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
@@ -564,7 +566,7 @@ const App = () => {
     dispatch({ type: 'SET_PROMPT_NAME', payload: prompt.name });
     dispatch({ type: 'SET_PROMPT_TEMPLATE', payload: prompt.template });
     dispatch({ type: 'SET_TEMPERATURE', payload: prompt.temperature || 0.7 });
-    setApiResult(null);
+    dispatch({ type: 'SET_API_RESPONSE', payload: null });
     dispatch({ type: 'CLEAR_HISTORY' });
     dispatch({ type: 'TOGGLE_LIBRARY', payload: false });
     showStatus(`Loaded "${prompt.name}".`, "info");
@@ -574,7 +576,7 @@ const App = () => {
     dispatch({ type: 'SELECT_PROMPT', payload: null });
     dispatch({ type: 'SET_PROMPT_NAME', payload: "Untitled Prompt" });
     dispatch({ type: 'SET_PROMPT_TEMPLATE', payload: "Your new prompt template with a {{variable}} here." });
-    setApiResult(null);
+    dispatch({ type: 'SET_API_RESPONSE', payload: null });
     dispatch({ type: 'CLEAR_HISTORY' });
     showStatus("Started a new prompt.", "info");
   };
@@ -713,7 +715,7 @@ const App = () => {
           <div className="flex flex-col gap-6">
             <Card title="Latest AI Response" icon={<Bot className="text-purple-400" />} className="h-full flex flex-col"
               actions={
-                <IconButton onClick={() => { if(apiResult?.text) { navigator.clipboard.writeText(apiResult.text); showStatus('Response copied!', 'success'); }}} disabled={!apiResult?.text || isLoading} tooltip="Copy" ariaLabel="Copy AI response">
+                <IconButton onClick={() => { if(apiResponse?.text) { navigator.clipboard.writeText(apiResponse.text); showStatus('Response copied!', 'success'); }}} disabled={!apiResponse?.text || isLoading} tooltip="Copy" ariaLabel="Copy AI response">
                   <Copy size={16}/>
                 </IconButton>
               }
@@ -721,10 +723,10 @@ const App = () => {
               <div className="flex-grow h-full bg-gray-900/50 border-white/10 rounded-lg p-3 text-gray-200 overflow-y-auto prose prose-invert prose-sm max-w-none min-h-[20rem]" aria-live="polite">
                 {isLoading ? (
                   <div className="flex items-center justify-center h-full text-gray-400"><Spinner /> <span className="ml-2">Waiting for response...</span></div>
-                ) : apiResult ? (
+                ) : apiResponse ? (
                     <>
-                      <div className="whitespace-pre-wrap">{apiResult.text}</div>
-                      {!apiResult.error && <PromptRating prompt={finalPrompt} source={provider} diagnostics={apiResult.diagnostics} />}
+                      <div className="whitespace-pre-wrap">{apiResponse.text}</div>
+                      {!apiResponse.error && <PromptRating prompt={finalPrompt} source={provider} diagnostics={apiResponse.diagnostics} />}
                     </>
                 ) : (
                   <p className="text-gray-500 flex items-center justify-center h-full">The AI's response will appear here.</p>
@@ -744,7 +746,7 @@ const App = () => {
                 <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
                 {responseHistory.length > 0 ? (
                     responseHistory.map((r, i) => (
-                    <div key={i} className="group relative text-sm p-2 bg-white/5 rounded-md border border-white/10 text-gray-400 truncate hover:bg-white/10 transition-colors cursor-pointer" onClick={() => setApiResult(r)} aria-label={`Previous response ${i+1}`}>
+                    <div key={i} className="group relative text-sm p-2 bg-white/5 rounded-md border border-white/10 text-gray-400 truncate hover:bg-white/10 transition-colors cursor-pointer" onClick={() => dispatch({ type: 'SET_API_RESPONSE', payload: r })} aria-label={`Previous response ${i+1}`}>
                         {r.text}
                         <IconButton 
                           onClick={(e) => {
