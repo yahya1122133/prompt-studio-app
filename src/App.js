@@ -221,7 +221,7 @@ const IconButton = ({ children, onClick, disabled = false, tooltip, ariaLabel })
 
 const Spinner = () => <Loader2 className="animate-spin" aria-label="Loading" />;
 
-const PromptRating = ({ prompt, source }) => {
+const PromptRating = ({ prompt, source, diagnostics }) => {
     const { dispatch } = usePromptContext();
     const [rating, setRating] = React.useState(0);
     const [isRated, setIsRated] = React.useState(false);
@@ -245,20 +245,32 @@ const PromptRating = ({ prompt, source }) => {
     };
   
     return (
-      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/10">
-        <span className="text-xs text-gray-400">Rate this response:</span>
-        {[1, 2, 3, 4, 5].map((star) => (
-          <button
-            key={star}
-            onClick={() => handleRating(star)}
-            className={`text-lg focus:outline-none transition-transform duration-150 ${isRated ? 'cursor-default' : 'hover:scale-125'}`}
-            aria-label={`Rate ${star} stars`}
-            disabled={isRated}
-          >
-            {star <= rating ? '⭐' : '☆'}
-          </button>
-        ))}
-        {isRated && <span className="text-xs text-green-400">Thanks!</span>}
+      <div className="mt-4 pt-4 border-t border-white/10">
+        {diagnostics && (
+          <div className="mb-4 p-3 bg-gray-800/50 rounded-lg border border-white/10">
+            <h4 className="font-semibold text-indigo-300 mb-2">Auto Mode Diagnostics</h4>
+            <div className="text-xs space-y-2 text-gray-400">
+                <p><strong>Original:</strong> "{diagnostics.original}"</p>
+                <p><strong>Analysis:</strong> {diagnostics.analysis}</p>
+                <p><strong>Justification:</strong> {diagnostics.validation}</p>
+            </div>
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400">Rate this response:</span>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              onClick={() => handleRating(star)}
+              className={`text-lg focus:outline-none transition-transform duration-150 ${isRated ? 'cursor-default' : 'hover:scale-125'}`}
+              aria-label={`Rate ${star} stars`}
+              disabled={isRated}
+            >
+              {star <= rating ? '⭐' : '☆'}
+            </button>
+          ))}
+          {isRated && <span className="text-xs text-green-400">Thanks!</span>}
+        </div>
       </div>
     );
 };
@@ -439,12 +451,17 @@ const App = () => {
     selectedPromptId, promptName, showLibrary, promptToDelete, statusMessage
   } = state;
 
+  const [apiResult, setApiResult] = useState(null);
+
   const showStatus = (text, type = 'info', duration = 3000) => {
     const id = Date.now();
     dispatch({ type: 'SET_STATUS', payload: { text, type, id } });
     const timer = setTimeout(() => {
-        dispatch({ type: 'SET_STATUS', payload: (currentState) => 
-            currentState.statusMessage.id === id ? { text: '', type: '', id: 0 } : currentState.statusMessage
+        dispatch(currentState => {
+            if (currentState.statusMessage.id === id) {
+                return { type: 'SET_STATUS', payload: { text: '', type: '', id: 0 } };
+            }
+            return currentState;
         });
     }, duration);
     return () => clearTimeout(timer);
@@ -462,7 +479,7 @@ const App = () => {
         return existingVar || { name, value: '' };
       })
     });
-  }, [promptTemplate, dispatch, variables]);
+  }, [promptTemplate, dispatch]);
 
   useEffect(() => {
     const filtered = savedPrompts.filter(p =>
@@ -481,11 +498,16 @@ const App = () => {
   
   const handleGenerateResponse = async (promptToGenerate, providerOverride) => {
     dispatch({ type: 'SET_LOADING', payload: true });
-    dispatch({ type: 'SET_API_RESPONSE', payload: '' });
+    setApiResult(null);
     showStatus("Generating response...", "info", 5000);
     
     try {
-      const response = await fetch('/.netlify/functions/ai-proxy', {
+      // FIXED: Construct a full URL for the fetch call to prevent parsing errors.
+      const apiEndpoint = process.env.NODE_ENV === 'production'
+        ? 'https://promptmakers.app/api/ai-proxy'
+        : 'http://localhost:8888/api/ai-proxy';
+
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -497,27 +519,19 @@ const App = () => {
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || 'An unknown error occurred.');
-      }
-
-      // Handle auto mode response differently
-      if ((providerOverride || provider) === 'auto' && data.components) {
-        dispatch({
-          type: 'SET_API_RESPONSE', 
-          payload: `### Auto Mode Results\n\n**Original Prompt:**\n${promptToGenerate}\n\n**Analysis:**\n${data.components.analysis}\n\n**Improved Prompt:**\n${data.components.improved}\n\n**Validation:**\n${data.components.validation}`
-        });
-      } else {
-        dispatch({ type: 'SET_API_RESPONSE', payload: data.text });
+        // The backend sends a structured error: data.error.message
+        throw new Error(data.error?.message || 'An unknown error occurred.');
       }
       
-      dispatch({ type: 'ADD_TO_HISTORY', payload: data.text });
+      setApiResult(data);
+      dispatch({ type: 'ADD_TO_HISTORY', payload: data });
       showStatus(`Success! (from ${data.provider})`, "success");
       dispatch({ type: 'LEARN_FROM_SUCCESS', payload: promptToGenerate });
 
     } catch (error) {
       console.error('API Error:', error);
       const errorMessage = `Error: ${error.message}`;
-      dispatch({ type: 'SET_API_RESPONSE', payload: errorMessage });
+      setApiResult({ text: errorMessage, error: true });
       showStatus(errorMessage, "error", 5000);
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
@@ -550,7 +564,7 @@ const App = () => {
     dispatch({ type: 'SET_PROMPT_NAME', payload: prompt.name });
     dispatch({ type: 'SET_PROMPT_TEMPLATE', payload: prompt.template });
     dispatch({ type: 'SET_TEMPERATURE', payload: prompt.temperature || 0.7 });
-    dispatch({ type: 'SET_API_RESPONSE', payload: '' });
+    setApiResult(null);
     dispatch({ type: 'CLEAR_HISTORY' });
     dispatch({ type: 'TOGGLE_LIBRARY', payload: false });
     showStatus(`Loaded "${prompt.name}".`, "info");
@@ -560,7 +574,7 @@ const App = () => {
     dispatch({ type: 'SELECT_PROMPT', payload: null });
     dispatch({ type: 'SET_PROMPT_NAME', payload: "Untitled Prompt" });
     dispatch({ type: 'SET_PROMPT_TEMPLATE', payload: "Your new prompt template with a {{variable}} here." });
-    dispatch({ type: 'SET_API_RESPONSE', payload: '' });
+    setApiResult(null);
     dispatch({ type: 'CLEAR_HISTORY' });
     showStatus("Started a new prompt.", "info");
   };
@@ -699,7 +713,7 @@ const App = () => {
           <div className="flex flex-col gap-6">
             <Card title="Latest AI Response" icon={<Bot className="text-purple-400" />} className="h-full flex flex-col"
               actions={
-                <IconButton onClick={() => { navigator.clipboard.writeText(apiResponse); showStatus('Response copied!', 'success'); }} disabled={!apiResponse || isLoading} tooltip="Copy" ariaLabel="Copy AI response">
+                <IconButton onClick={() => { if(apiResult?.text) { navigator.clipboard.writeText(apiResult.text); showStatus('Response copied!', 'success'); }}} disabled={!apiResult?.text || isLoading} tooltip="Copy" ariaLabel="Copy AI response">
                   <Copy size={16}/>
                 </IconButton>
               }
@@ -707,19 +721,10 @@ const App = () => {
               <div className="flex-grow h-full bg-gray-900/50 border-white/10 rounded-lg p-3 text-gray-200 overflow-y-auto prose prose-invert prose-sm max-w-none min-h-[20rem]" aria-live="polite">
                 {isLoading ? (
                   <div className="flex items-center justify-center h-full text-gray-400"><Spinner /> <span className="ml-2">Waiting for response...</span></div>
-                ) : apiResponse ? (
+                ) : apiResult ? (
                     <>
-                      <div className="whitespace-pre-wrap">
-                        {apiResponse.split('\n').map((line, i) => {
-                          if (line.startsWith('### ')) {
-                            return <h3 key={i} className="text-lg font-bold text-indigo-300 mt-4 mb-2">{line.replace('### ', '')}</h3>;
-                          } else if (line.startsWith('**')) {
-                            return <h4 key={i} className="font-semibold text-white mt-3 mb-1">{line.replace(/\*\*/g, '')}</h4>;
-                          }
-                          return <p key={i} className="mb-2">{line}</p>;
-                        })}
-                      </div>
-                      <PromptRating prompt={finalPrompt} source={provider} />
+                      <div className="whitespace-pre-wrap">{apiResult.text}</div>
+                      {!apiResult.error && <PromptRating prompt={finalPrompt} source={provider} diagnostics={apiResult.diagnostics} />}
                     </>
                 ) : (
                   <p className="text-gray-500 flex items-center justify-center h-full">The AI's response will appear here.</p>
@@ -739,12 +744,12 @@ const App = () => {
                 <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
                 {responseHistory.length > 0 ? (
                     responseHistory.map((r, i) => (
-                    <div key={i} className="group relative text-sm p-2 bg-white/5 rounded-md border border-white/10 text-gray-400 truncate hover:bg-white/10 transition-colors cursor-pointer" onClick={() => dispatch({ type: 'SET_API_RESPONSE', payload: r })} aria-label={`Previous response ${i+1}`}>
-                        {r}
+                    <div key={i} className="group relative text-sm p-2 bg-white/5 rounded-md border border-white/10 text-gray-400 truncate hover:bg-white/10 transition-colors cursor-pointer" onClick={() => setApiResult(r)} aria-label={`Previous response ${i+1}`}>
+                        {r.text}
                         <IconButton 
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigator.clipboard.writeText(r);
+                            navigator.clipboard.writeText(r.text);
                             showStatus('Copied to clipboard!', 'success');
                           }} 
                           className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
