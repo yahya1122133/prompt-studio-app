@@ -42,7 +42,7 @@ const learnFromSuccess = (learningState, prompt) => {
 const initialState = {
   promptTemplate: 'Generate a creative tweet about {{product}}.',
   variables: [],
-  apiResponse: null, // Changed to null for clearer initial state
+  apiResponse: null,
   responseHistory: [],
   isLoading: false,
   isSaving: false,
@@ -345,11 +345,11 @@ const Footer = () => {
                            </div>
                            <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white font-medium py-3 rounded-lg transition-opacity">Submit Report</button>
                            <p className="mt-6 text-center text-gray-400 text-sm">
-    Or email us directly at:<br />
-    <a href="mailto:mindsetwarriorsacademy@gmail.com" className="text-indigo-400 hover:underline break-all">
-      mindsetwarriorsacademy@gmail.com
-    </a>
-  </p>
+  Or email us directly at:<br />
+  <a href="mailto:mindsetwarriorsacademy@gmail.com" className="text-indigo-400 hover:underline break-all">
+    mindsetwarriorsacademy@gmail.com
+  </a>
+</p>
                        </div>
                    </form>
                  </div>
@@ -430,6 +430,30 @@ const Footer = () => {
 // ===== MAIN APP COMPONENT =====
 const App = () => {
   const { state, dispatch } = usePromptContext();
+
+  // ***** START: GTM SCRIPT INJECTION *****
+  useEffect(() => {
+    const gtmId = process.env.REACT_APP_GTM_ID;
+
+    if (!gtmId) {
+      console.warn("GTM ID not found in environment variables.");
+      return;
+    }
+
+    // This code is a direct translation of the GTM script
+    (function(w,d,s,l,i){
+      w[l]=w[l]||[];
+      w[l].push({'gtm.start': new Date().getTime(), event:'gtm.js'});
+      var f=d.getElementsByTagName(s)[0],
+          j=d.createElement(s),
+          dl=l!=='dataLayer'?'&l='+l:'';
+      j.async=true;
+      j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;
+      f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer', gtmId);
+
+  }, []); // The empty array ensures this runs only once
+  // ***** END: GTM SCRIPT INJECTION *****
   
   // Netlify Identity Integration
   useEffect(() => {
@@ -462,7 +486,6 @@ const App = () => {
     return () => clearTimeout(timer);
   };
 
-  // FIXED: Added 'variables' to the dependency array and a guard clause to prevent infinite loops.
   useEffect(() => {
     const regex = /{{\s*(\w+)\s*}}/g;
     const matches = promptTemplate.match(regex) || [];
@@ -473,7 +496,6 @@ const App = () => {
         return existingVar || { name, value: '' };
     });
 
-    // Prevents dispatching if the variable structure hasn't changed, avoiding a loop.
     if (JSON.stringify(newVariables) !== JSON.stringify(variables)) {
         dispatch({
           type: 'SET_VARIABLES',
@@ -499,12 +521,10 @@ const App = () => {
   
   const handleGenerateResponse = async (promptToGenerate, providerOverride) => {
     dispatch({ type: 'SET_LOADING', payload: true });
-    // FIXED: Use dispatch to clear the previous response from global state
     dispatch({ type: 'SET_API_RESPONSE', payload: null });
     showStatus("Generating response...", "info", 5000);
     
     try {
-      // Use the new, cleaner proxy path
       const apiEndpoint = '/api/ai-proxy';
 
       const response = await fetch(apiEndpoint, {
@@ -519,11 +539,9 @@ const App = () => {
 
       const data = await response.json();
       if (!response.ok) {
-        // The backend sends a structured error: data.error.message
         throw new Error(data.error?.message || 'An unknown error occurred.');
       }
       
-      // FIXED: Use dispatch to set the new response in global state
       dispatch({ type: 'SET_API_RESPONSE', payload: data });
       dispatch({ type: 'ADD_TO_HISTORY', payload: data });
       showStatus(`Success! (from ${data.provider})`, "success");
@@ -532,7 +550,6 @@ const App = () => {
     } catch (error) {
       console.error('API Error:', error);
       const errorMessage = `Error: ${error.message}`;
-      // FIXED: Use dispatch to set the error response in global state
       dispatch({ type: 'SET_API_RESPONSE', payload: { text: errorMessage, error: true } });
       showStatus(errorMessage, "error", 5000);
     } finally {
@@ -593,29 +610,6 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans p-4 lg:p-6 bg-grid-white/[0.05] pb-24 sm:pb-6">
-      {/* Structured Data for SEO */}
-      <script type="application/ld+json">
-        {JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": "SoftwareApplication",
-          "name": "Promptmakers",
-          "description": "AI prompt engineering studio for crafting and optimizing prompts",
-          "applicationCategory": "Productivity",
-          "operatingSystem": "Web",
-          "url": "https://promptmakers.netlify.app",
-          "offers": {
-            "@type": "Offer",
-            "price": "0",
-            "priceCurrency": "USD"
-          },
-          "aggregateRating": {
-            "@type": "AggregateRating",
-            "ratingValue": "4.8",
-            "ratingCount": "25"
-          }
-        })}
-      </script>
-      
       <div className="max-w-7xl mx-auto">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
           <div className="flex items-center gap-3 mb-4 sm:mb-0">
@@ -685,14 +679,14 @@ const App = () => {
               <div className="space-y-4">
                 <div>
                   <h3 className="block text-sm font-medium text-gray-300 mb-1.5">Model Provider</h3>
-                   <div className="flex gap-2">
+                    <div className="flex gap-2">
                         {['auto', 'gemini', 'deepseek'].map(p => (
                             <button key={p} onClick={() => dispatch({type: 'SET_PROVIDER', payload: p})}
                                 className={`flex-1 py-2 text-sm font-semibold rounded-md transition-colors ${provider === p ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
                                 {p.charAt(0).toUpperCase() + p.slice(1)}
                             </button>
                         ))}
-                   </div>
+                    </div>
                 </div>
                 <div>
                   <label htmlFor="temperature-slider" className="block text-sm font-medium text-gray-300 mb-1.5">
@@ -746,20 +740,20 @@ const App = () => {
                 <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
                 {responseHistory.length > 0 ? (
                     responseHistory.map((r, i) => (
-                    <div key={i} className="group relative text-sm p-2 bg-white/5 rounded-md border border-white/10 text-gray-400 truncate hover:bg-white/10 transition-colors cursor-pointer" onClick={() => dispatch({ type: 'SET_API_RESPONSE', payload: r })} aria-label={`Previous response ${i+1}`}>
-                        {r.text}
-                        <IconButton 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigator.clipboard.writeText(r.text);
-                            showStatus('Copied to clipboard!', 'success');
-                          }} 
-                          className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
-                          ariaLabel="Copy response"
-                        >
-                          <Copy size={14} />
-                        </IconButton>
-                    </div>
+                      <div key={i} className="group relative text-sm p-2 bg-white/5 rounded-md border border-white/10 text-gray-400 truncate hover:bg-white/10 transition-colors cursor-pointer" onClick={() => dispatch({ type: 'SET_API_RESPONSE', payload: r })} aria-label={`Previous response ${i+1}`}>
+                          {r.text}
+                          <IconButton 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(r.text);
+                              showStatus('Copied to clipboard!', 'success');
+                            }} 
+                            className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
+                            ariaLabel="Copy response"
+                          >
+                            <Copy size={14} />
+                          </IconButton>
+                      </div>
                     ))
                 ) : (
                     <p className="text-gray-500 text-sm">Previous responses will be logged here.</p>
@@ -860,13 +854,6 @@ const App = () => {
         </div>
       )}
 
-      {/* Netlify CMS script */}
-      {process.env.NODE_ENV === 'production' && (
-        <script 
-          src="https://identity.netlify.com/v1/netlify-identity-widget.js" 
-          async
-        />
-      )}
     </div>
   );
 };

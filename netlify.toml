@@ -5,26 +5,18 @@
 
 # Build settings for your React application
 [build]
-  # Command to build the site
   command = "npm install && npm run build"
-  # The directory that contains the built site
   publish = "build"
-  # The directory where your serverless functions are located
   functions = "netlify/functions"
 
 [build.environment]
-  # Specify the Node.js version to use for the build
   NODE_VERSION = "20"
-  # A common flag for continuous integration environments
   CI = "true"
-  # Helps resolve dependency conflicts during installation
   NPM_FLAGS = "--legacy-peer-deps"
 
 # Serverless Functions configuration
 [functions]
-  # Use esbuild for faster function bundling
   node_bundler = "esbuild"
-  # Sets a default timeout for all functions, which we've optimized for
   [functions.timeout]
     default = 10
 
@@ -40,9 +32,8 @@
 [build.processing.html]
   pretty_urls = true
 
-# Netlify plugins to add extra functionality
+# Netlify plugins
 [[plugins]]
-  # Automatically generates a sitemap for your site
   package = "@netlify/plugin-sitemap"
 
 # ==============================================================================
@@ -58,15 +49,12 @@
     X-Content-Type-Options = "nosniff"
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    # Content Security Policy to lock down resource loading
-    # UPDATED: Added Google domains for analytics and tag management
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://identity.netlify.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://api.deepseek.com https://www.google-analytics.com https://ssl.google-analytics.com; frame-src 'self'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://identity.netlify.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://api.deepseek.com https://www.google-analytics.com https://ssl.google-analytics.com; frame-src 'self' https://app.netlify.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';"
 
 # Caching headers for static assets (like JS, CSS, images)
 [[headers]]
   for = "/static/*"
   [headers.values]
-    # Tell browsers to cache these files for one year
     Cache-Control = "public, max-age=31536000, immutable"
 
 # ==============================================================================
@@ -74,17 +62,13 @@
 # The order of these rules is critical.
 # ==============================================================================
 
-# CRITICAL: This rule proxies requests from /api/* to your serverless function.
-# This must come BEFORE the Single-Page App (SPA) rule.
+# Proxy requests from /api/* to serverless functions
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
 
-# This is the standard rule for a Single-Page Application (like React).
-# It ensures that any direct navigation to a route (e.g., /about)
-# serves your main index.html file, allowing React Router to take over.
-# This must be the LAST redirect rule.
+# Single-Page App fallback rule (must be last)
 [[redirects]]
   from = "/*"
   to = "/index.html"
