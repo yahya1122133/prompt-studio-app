@@ -56,6 +56,12 @@
   to = "/.netlify/functions/ai-proxy"
   status = 200
 
+# Add health check redirect
+[[redirects]]
+  from = "/health"
+  to = "/.netlify/functions/ai-proxy"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

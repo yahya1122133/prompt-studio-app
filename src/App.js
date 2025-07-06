@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useMemo, createContext, useContext, useReducer } from 'react';
 import { ArrowRight, Book, Bot, Copy, History, Loader2, Save, Search, Settings, Trash2, Wand2, X, Plus, Sparkles } from 'lucide-react';
 
-// ===== HELPER FUNCTIONS =====
+// ===== HELPER FUNCTIONS (CSP-SAFE) =====
 const extractPatterns = (prompt) => {
-  const hasVariables = /{{\s*\w+\s*}}/.test(prompt);
-  const mentionsPersona = /act as/i.test(prompt);
-  const mentionsFormat = /format as|in a (json|list|table) format/i.test(prompt);
+  // CSP-safe implementation without regex
+  const hasVariables = prompt.includes("{{") && prompt.includes("}}");
+  const mentionsPersona = prompt.toLowerCase().includes("act as");
+  const mentionsFormat = 
+    prompt.toLowerCase().includes("format as") || 
+    prompt.toLowerCase().includes("in a json format") ||
+    prompt.toLowerCase().includes("in a list format") ||
+    prompt.toLowerCase().includes("in a table format");
+    
   return {
     length: prompt.length,
     variables: hasVariables,
@@ -275,6 +281,49 @@ const PromptRating = ({ prompt, source, diagnostics }) => {
     );
 };
 
+// ===== ERROR BOUNDARY =====
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught an error:", error, errorInfo);
+  }
+
+  handleReload = () => {
+    window.location.reload();
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+          <div className="bg-gray-800 border border-white/10 rounded-xl p-8 max-w-md text-center">
+            <div className="bg-red-500/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+              <X className="w-10 h-10 text-red-500" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Something Went Wrong</h2>
+            <p className="text-gray-400 mb-6">
+              We encountered an unexpected error. Please try reloading the application.
+            </p>
+            <Button onClick={this.handleReload} variant="primary" className="w-full">
+              Reload Application
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 // ===== FOOTER COMPONENT & MODAL LOGIC =====
 const Footer = () => {
     const [modal, setModal] = useState(null);
@@ -431,41 +480,46 @@ const Footer = () => {
 const App = () => {
   const { state, dispatch } = usePromptContext();
 
-  // ***** START: GTM SCRIPT INJECTION *****
+  // CSP-safe GTM implementation
   useEffect(() => {
     const gtmId = process.env.REACT_APP_GTM_ID;
-
     if (!gtmId) {
       console.warn("GTM ID not found in environment variables.");
       return;
     }
 
-    // This code is a direct translation of the GTM script
-    (function(w,d,s,l,i){
-      w[l]=w[l]||[];
-      w[l].push({'gtm.start': new Date().getTime(), event:'gtm.js'});
-      var f=d.getElementsByTagName(s)[0],
-          j=d.createElement(s),
-          dl=l!=='dataLayer'?'&l='+l:'';
-      j.async=true;
-      j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;
-      f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer', gtmId);
+    // Create script element
+    const script = document.createElement('script');
+    script.src = `https://www.googletagmanager.com/gtm.js?id=${gtmId}`;
+    script.async = true;
+    
+    // Add to document head
+    document.head.appendChild(script);
 
-  }, []); // The empty array ensures this runs only once
-  // ***** END: GTM SCRIPT INJECTION *****
-  
+    // Initialize dataLayer
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      'gtm.start': new Date().getTime(),
+      event: 'gtm.js'
+    });
+
+    return () => {
+      // Cleanup on unmount
+      document.head.removeChild(script);
+    };
+  }, []);
+
   // Netlify Identity Integration
   useEffect(() => {
-    // Netlify Identity for prerendering
-    if (window.netlifyIdentity) {
+    if (typeof window !== 'undefined' && window.netlifyIdentity) {
       window.netlifyIdentity.on('init', user => {
         if (!user) {
           window.netlifyIdentity.on('login', () => {
-            document.location.href = '/admin/';
+            window.location.href = '/admin/';
           });
         }
       });
+      window.netlifyIdentity.init();
     }
   }, []);
 
@@ -487,9 +541,24 @@ const App = () => {
   };
 
   useEffect(() => {
-    const regex = /{{\s*(\w+)\s*}}/g;
-    const matches = promptTemplate.match(regex) || [];
-    const uniqueVars = [...new Set(matches.map(v => v.replace(/{{\s*|\s*}}/g, '')))];
+    // CSP-safe variable extraction
+    const varNames = [];
+    let pos = 0;
+    
+    while (pos < promptTemplate.length) {
+      const start = promptTemplate.indexOf('{{', pos);
+      if (start === -1) break;
+      
+      const end = promptTemplate.indexOf('}}', start + 2);
+      if (end === -1) break;
+      
+      const varName = promptTemplate.substring(start + 2, end).trim();
+      if (varName) varNames.push(varName);
+      
+      pos = end + 2;
+    }
+    
+    const uniqueVars = [...new Set(varNames)];
     
     const newVariables = uniqueVars.map(name => {
         const existingVar = variables.find(v => v.name === name);
@@ -512,17 +581,24 @@ const App = () => {
     dispatch({ type: 'SET_FILTERED_PROMPTS', payload: filtered });
   }, [librarySearchTerm, savedPrompts, dispatch]);
 
+  // CSP-safe variable replacement
   const finalPrompt = useMemo(() => {
-    return variables.reduce((acc, curr) => {
-      const regex = new RegExp(`{{\\s*${curr.name}\\s*}}`, 'g');
-      return acc.replace(regex, curr.value || `{{${curr.name}}}`);
-    }, promptTemplate);
+    let result = promptTemplate;
+    variables.forEach(v => {
+      const placeholder = `{{${v.name}}}`;
+      result = result.split(placeholder).join(v.value || placeholder);
+    });
+    return result;
   }, [promptTemplate, variables]);
   
   const handleGenerateResponse = async (promptToGenerate, providerOverride) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_API_RESPONSE', payload: null });
     showStatus("Generating response...", "info", 5000);
+    
+    // Add timeout controller
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
     
     try {
       const apiEndpoint = '/api/ai-proxy';
@@ -534,7 +610,8 @@ const App = () => {
           provider: providerOverride || provider,
           prompt: promptToGenerate,
           temperature
-        })
+        }),
+        signal: controller.signal
       });
 
       const data = await response.json();
@@ -549,10 +626,28 @@ const App = () => {
 
     } catch (error) {
       console.error('API Error:', error);
-      const errorMessage = `Error: ${error.message}`;
-      dispatch({ type: 'SET_API_RESPONSE', payload: { text: errorMessage, error: true } });
+      
+      let errorMessage = 'An unknown error occurred';
+      if (error.name === 'AbortError') {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (error.message.includes('Failed to fetch')) {
+        errorMessage = 'Network error. Please check your connection.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      dispatch({ 
+        type: 'SET_API_RESPONSE', 
+        payload: { 
+          text: `Error: ${errorMessage}`,
+          error: true,
+          statusCode: error.status || 500
+        } 
+      });
+      
       showStatus(errorMessage, "error", 5000);
     } finally {
+      clearTimeout(timeoutId);
       dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
@@ -861,8 +956,10 @@ const App = () => {
 // ===== APP WRAPPER =====
 export default function AppWrapper() {
   return (
-    <PromptProvider>
-      <App />
-    </PromptProvider>
+    <ErrorBoundary>
+      <PromptProvider>
+        <App />
+      </PromptProvider>
+    </ErrorBoundary>
   );
 }
