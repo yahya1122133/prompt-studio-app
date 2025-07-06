@@ -1,11 +1,9 @@
 # ==============================================================================
 # Netlify Configuration File
-# This file tells Netlify how to build, deploy, and serve your application.
 # ==============================================================================
 
-# Build settings for your React application
 [build]
-  command = "npm install && npm run build"
+  command = "npm install && cd netlify/functions && npm install && cd ../../ && npm run build"
   publish = "build"
   functions = "netlify/functions"
 
@@ -14,13 +12,11 @@
   CI = "true"
   NPM_FLAGS = "--legacy-peer-deps"
 
-# Serverless Functions configuration
 [functions]
   node_bundler = "esbuild"
   [functions.timeout]
-    default = 10
+    default = 9.5
 
-# Asset processing settings to optimize your site
 [build.processing]
   skip_processing = false
 [build.processing.css]
@@ -32,16 +28,10 @@
 [build.processing.html]
   pretty_urls = true
 
-# Netlify plugins
 [[plugins]]
   package = "@netlify/plugin-sitemap"
 
-# ==============================================================================
-# HTTP Headers
-# These rules enhance your site's security and performance.
-# ==============================================================================
-
-# Security headers applied to all pages
+# Security headers
 [[headers]]
   for = "/*"
   [headers.values]
@@ -49,26 +39,23 @@
     X-Content-Type-Options = "nosniff"
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://identity.netlify.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://api.deepseek.com https://www.google-analytics.com https://ssl.google-analytics.com; frame-src 'self' https://app.netlify.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://identity.netlify.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://api.deepseek.com https://www.google-analytics.com https://ssl.google-analytics.com; frame-src 'self' https://app.netlify.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'"
 
-# Caching headers for static assets (like JS, CSS, images)
 [[headers]]
   for = "/static/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# ==============================================================================
-# Redirects and Rewrites
-# The order of these rules is critical.
-# ==============================================================================
-
-# Proxy requests from /api/* to serverless functions
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
 
-# Single-Page App fallback rule (must be last)
+[[redirects]]
+  from = "/ai-proxy"
+  to = "/.netlify/functions/ai-proxy"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

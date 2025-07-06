@@ -1,10 +1,17 @@
 /**
  * @file This serverless function acts as a secure, rate-limited, and resilient proxy for various AI model providers.
  * @author Gemini
- * @version 4.0.0
+ * @version 4.1.0
  *
  * This version is optimized for Netlify's 10-second limit and includes production-grade
  * features like global rate limiting, response caching, a health check endpoint, and pre-warmed connections.
+ * 
+ * Changes in 4.1.0:
+ * - Reduced timeout thresholds to avoid Netlify's 10s limit
+ * - Added separate connection timeout for upstream APIs
+ * - Enhanced circuit breaker with state logging
+ * - Added AbortController for fetch requests
+ * - Improved error logging with network diagnostics
  */
 
 // ================ Dependencies ================
@@ -19,12 +26,13 @@ const Redis = require('ioredis');
 const CONFIG = {
     MAX_INPUT_LENGTH: 1500,
     MAX_OUTPUT_LENGTH: 5000,
-    TIMEOUT_MS: 8500,
+    TIMEOUT_MS: 7900,        // Reduced from 8500 to 7900 (7.9s)
+    CONNECT_TIMEOUT_MS: 3000, // Added connection timeout
     MAX_RETRIES: 1,
-    RATE_LIMIT: 8,          // Per-IP limit
-    GLOBAL_RATE_LIMIT: 100,     // Total requests per minute for the entire service
+    RATE_LIMIT: 8,           // Per-IP limit
+    GLOBAL_RATE_LIMIT: 100,  // Total requests per minute
     RATE_WINDOW_MS: 60000,
-    CACHE_TTL_SECONDS: 30,      // Cache duration for 'auto' mode responses
+    CACHE_TTL_SECONDS: 30,   // Cache duration for 'auto' mode
     CIRCUIT_BREAKER_THRESHOLD: 3,
     CIRCUIT_BREAKER_TIMEOUT_MS: 60000,
     DEFAULT_PROVIDER: 'auto',
@@ -72,7 +80,6 @@ const rateLimiter = {
     inMemoryStore: new Map(),
     check: async (ip) => {
         if (redisClient) {
-            // Use Promise.all to run checks concurrently for performance
             const [globalCount, ipCount] = await Promise.all([
                 redisClient.incr('rate_limit:global'),
                 redisClient.incr(`rate_limit:${ip}`)
@@ -88,7 +95,6 @@ const rateLimiter = {
                 throw new RateLimitError('Per-IP rate limit exceeded.');
             }
         } else {
-            // In-memory fallback
             const now = Date.now();
             const windowStart = now - CONFIG.RATE_WINDOW_MS;
             const userRequests = (rateLimiter.inMemoryStore.get(ip) || []).filter(t => t > windowStart);
@@ -104,13 +110,28 @@ const rateLimiter = {
 // ================ Resilience Patterns ================
 
 const createCircuitBreaker = () => {
-    const state = { failures: 0, lastFailure: 0, isOpen: false };
+    const state = { 
+        failures: 0, 
+        lastFailure: 0, 
+        isOpen: false,
+        lastStateChange: Date.now()
+    };
+    
+    const logStateChange = (newState) => {
+        logger.info(`Circuit breaker state changed to ${newState}`, {
+            failures: state.failures,
+            lastFailure: new Date(state.lastFailure).toISOString(),
+            durationOpen: state.isOpen ? Date.now() - state.lastFailure : null
+        });
+    };
+    
     return async (fn) => {
         const now = Date.now();
         if (state.isOpen) {
             if (now - state.lastFailure > CONFIG.CIRCUIT_BREAKER_TIMEOUT_MS) {
                 state.isOpen = false;
-                logger.info('Circuit breaker is now half-open.');
+                state.lastStateChange = now;
+                logStateChange('half-open');
             } else {
                 throw new CircuitBreakerOpenError();
             }
@@ -118,16 +139,18 @@ const createCircuitBreaker = () => {
         try {
             const result = await fn();
             if (state.failures > 0) {
-                logger.info('Circuit breaker closed. Service restored.');
+                logStateChange('closed');
                 state.failures = 0;
+                state.lastStateChange = now;
             }
             return result;
         } catch (error) {
             state.failures++;
             state.lastFailure = now;
-            if (state.failures >= CONFIG.CIRCUIT_BREAKER_THRESHOLD) {
+            if (state.failures >= CONFIG.CIRCUIT_BREAKER_THRESHOLD && !state.isOpen) {
                 state.isOpen = true;
-                logger.warn('Circuit breaker opened due to repeated failures.');
+                state.lastStateChange = now;
+                logStateChange('open');
             }
             throw error;
         }
@@ -196,20 +219,46 @@ async function callDeepSeek(prompt, temperature) {
     return deepseekBreaker(async () => {
         const apiKey = process.env.DEEPSEEK_API_KEY;
         validateApiKey(apiKey, 'DeepSeek');
-        const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-                model: "deepseek-chat",
-                messages: [{ role: "user", content: prompt }],
-                temperature: clamp(temperature, 0.1, 1.0),
-                max_tokens: 1024
-            })
-        });
-        if (!response.ok) throw new ApiError(`DeepSeek API error: ${response.status}`, 502);
-        const data = await response.json();
-        if (!data.choices?.[0]?.message?.content) throw new ApiError('Invalid response structure from DeepSeek API.', 502);
-        return validateAndFormatApiResponse(data.choices[0].message.content);
+        
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), CONFIG.TIMEOUT_MS);
+        
+        try {
+            const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
+                method: "POST",
+                headers: { 
+                    "Authorization": `Bearer ${apiKey}`, 
+                    "Content-Type": "application/json" 
+                },
+                body: JSON.stringify({
+                    model: "deepseek-chat",
+                    messages: [{ role: "user", content: prompt }],
+                    temperature: clamp(temperature, 0.1, 1.0),
+                    max_tokens: 1024
+                }),
+                signal: controller.signal
+            });
+            
+            if (!response.ok) {
+                const errorBody = await response.text();
+                logger.error(`DeepSeek API error: ${response.status} - ${errorBody}`);
+                throw new ApiError(`DeepSeek API error: ${response.status}`, 502);
+            }
+            
+            const data = await response.json();
+            if (!data.choices?.[0]?.message?.content) {
+                throw new ApiError('Invalid response structure from DeepSeek API.', 502);
+            }
+            
+            return validateAndFormatApiResponse(data.choices[0].message.content);
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                throw new TimeoutError('DeepSeek API request timed out');
+            }
+            throw error;
+        } finally {
+            clearTimeout(timeout);
+        }
     });
 }
 
@@ -270,7 +319,6 @@ const apiProviders = {
 };
 
 // ================ Initial Validation ================
-// **IMPROVEMENT**: Validate environment once on cold start, not on every request.
 try {
     validateEnvironment();
 } catch (e) {
@@ -286,7 +334,7 @@ exports.handler = async (event) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 status: 'ok',
-                version: '4.0.0',
+                version: '4.1.0',
                 timestamp: new Date().toISOString()
             })
         };
@@ -295,6 +343,9 @@ exports.handler = async (event) => {
     const context = {
         requestId: Math.random().toString(36).substring(2, 9),
         clientIP: event.headers['x-nf-client-connection-ip'] || 'unknown',
+        cfRay: event.headers['cf-ray'] || 'none',
+        userAgent: event.headers['user-agent'] || 'unknown',
+        memoryUsage: process.memoryUsage()
     };
     const startTime = Date.now();
 
@@ -312,7 +363,13 @@ exports.handler = async (event) => {
         const providerFunction = apiProviders[provider];
         if (!providerFunction) throw new ValidationError(`Invalid provider. Available: ${Object.keys(apiProviders).join(', ')}`);
 
-        const promiseToExecute = () => promiseWithTimeout(providerFunction(cleanPrompt, safeTemp), CONFIG.TIMEOUT_MS);
+        const promiseToExecute = () => 
+            promiseWithTimeout(
+                providerFunction(cleanPrompt, safeTemp), 
+                CONFIG.TIMEOUT_MS,
+                CONFIG.CONNECT_TIMEOUT_MS
+            );
+            
         const result = await withRetry(promiseToExecute);
         
         context.duration = Date.now() - startTime;
@@ -326,28 +383,59 @@ exports.handler = async (event) => {
 
     } catch (error) {
         context.duration = Date.now() - startTime;
+        context.errorType = error.name;
+        context.errorMessage = error.message;
+        
         logger.error(error, context);
+        
         const statusCode = error instanceof ApiError ? error.statusCode : 500;
         const message = error instanceof ApiError ? error.message : 'An internal server error occurred.';
+        
         return {
             statusCode,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ error: { type: error.name || 'InternalError', message, requestId: context.requestId } })
+            body: JSON.stringify({ 
+                error: { 
+                    type: error.name || 'InternalError', 
+                    message, 
+                    requestId: context.requestId 
+                } 
+            })
         };
     }
 };
 
-// ================ ADDED: Timeout Helper Function ================
-/**
- * Wraps a promise in a timeout.
- * @param {Promise} promise The promise to execute.
- * @param {number} ms The timeout duration in milliseconds.
- * @returns {Promise} A new promise that will either resolve with the original promise's result or reject with a TimeoutError.
- */
-const promiseWithTimeout = (promise, ms) => {
-    let timeoutId;
-    const timeout = new Promise((_, reject) => {
-        timeoutId = setTimeout(() => reject(new TimeoutError(`Request timed out after ${ms}ms`)), ms);
+// ================ Timeout Helper Function ================
+const promiseWithTimeout = (promise, timeoutMs, connectTimeoutMs) => {
+    return new Promise((resolve, reject) => {
+        const connectTimer = setTimeout(() => {
+            reject(new TimeoutError(`Connection timed out after ${connectTimeoutMs}ms`));
+        }, connectTimeoutMs);
+
+        const overallTimer = setTimeout(() => {
+            reject(new TimeoutError(`Request timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+
+        promise
+            .then(result => {
+                clearTimeout(connectTimer);
+                clearTimeout(overallTimer);
+                resolve(result);
+            })
+            .catch(error => {
+                clearTimeout(connectTimer);
+                clearTimeout(overallTimer);
+                reject(error);
+            });
     });
-    return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
 };
+
+// ================ Global Error Handlers ================
+process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection at:', { promise, reason });
+});
+
+process.on('uncaughtException', (error) => {
+    logger.error('Uncaught Exception thrown:', error);
+    process.exit(1);
+});
