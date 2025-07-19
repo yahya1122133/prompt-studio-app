@@ -12,7 +12,7 @@ import { AnimatePresence } from 'framer-motion';
 import { PromptProvider, usePromptContext } from './context/PromptContext';
 import PropTypes from 'prop-types';
 
-// Centralized lazy loading imports - using original design
+// Simple lazy loading for better stability
 const AppContent = React.lazy(() => import('./components/AppContent'));
 const PromptLibrary = React.lazy(() => import('./components/features/PromptLibrary'));
 const DeleteConfirmation = React.lazy(() => import('./components/features/DeleteConfirmation'));

@@ -11,8 +11,8 @@ const Redis = require('ioredis');
 const CONFIG = {
     MAX_INPUT_LENGTH: 1500,
     MAX_OUTPUT_LENGTH: 5000,
-    TIMEOUT_MS: 6000,        // 6 seconds (safer for Netlify)
-    CONNECT_TIMEOUT_MS: 2000, // 2 seconds
+    TIMEOUT_MS: 25000,       // 25 seconds (within Netlify limit)
+    CONNECT_TIMEOUT_MS: 5000, // 5 seconds
     MAX_RETRIES: 1,
     RATE_LIMIT: 8,
     GLOBAL_RATE_LIMIT: 100,
