@@ -3,17 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta http-equiv="Content-Security-Policy" content="
-    default-src 'self'; 
-    script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://identity.netlify.com; 
-    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; 
-    img-src 'self' data: https://promptmakers.app; 
-    font-src 'self' https://fonts.gstatic.com; 
-    connect-src 'self' https://*.googleapis.com https://*.netlify.com; 
-    frame-src https://www.googletagmanager.com; 
-    base-uri 'self'; 
-    form-action 'self'; 
-    object-src 'none';">
+
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -51,12 +41,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://www.googletagmanager.com">
-  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-  })(window,document,'script','dataLayer','%REACT_APP_GTM_ID%');</script>
   
+  <script>window.REACT_APP_GTM_ID = '%REACT_APP_GTM_ID%';</script>
+  <script defer src="%PUBLIC_URL%/gtm.js"></script>
   <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 
   <script type="application/ld+json">
@@ -91,16 +78,6 @@
   
   <div id="root"></div>
   
-  <script>
-    if (window.netlifyIdentity) {
-      window.netlifyIdentity.on("init", user => {
-        if (!user) {
-          window.netlifyIdentity.on("login", () => {
-            document.location.href = "/admin/";
-          });
-        }
-      });
-    }
-  </script>
+  <script defer src="%PUBLIC_URL%/netlify-identity.js"></script>
 </body>
 </html>

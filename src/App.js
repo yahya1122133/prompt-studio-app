@@ -8,12 +8,12 @@ import React, {
   useRef,
   Suspense // This was the missing piece
 } from 'react';
-import { AnimatePresence } from 'framer-motion';
+// Removed AnimatePresence import for better performance
 import { PromptProvider, usePromptContext } from './context/PromptContext';
 import PropTypes from 'prop-types';
 
-// Centralized lazy loading imports - using direct React.lazy for debugging
-const AppContent = React.lazy(() => import('./components/AppContent'));
+// Centralized lazy loading imports - using optimized version
+const AppContent = React.lazy(() => import('./components/AppContentOptimized'));
 const PromptLibrary = React.lazy(() => import('./components/features/PromptLibrary'));
 const DeleteConfirmation = React.lazy(() => import('./components/features/DeleteConfirmation'));
 const Footer = React.lazy(() => import('./components/layouts/Footer'));
@@ -98,7 +98,7 @@ const AppController = () => {
         />
       </Suspense>
 
-      <AnimatePresence mode="wait">
+      <div>
         {/* Prompt Library Modal */}
         {showLibrary && (
           <Suspense fallback={<ModalLoader />} key="library-modal">
@@ -135,7 +135,7 @@ const AppController = () => {
             />
           </Suspense>
         )}
-      </AnimatePresence>
+      </div>
 
       {/* Footer */}
       <Suspense fallback={<div className="h-24 bg-gray-800/50" />}>
