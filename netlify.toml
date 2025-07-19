@@ -1,110 +1,40 @@
-# ==============================================================================
-# Netlify Configuration File
-# ==============================================================================
-
 [build]
-  command = "npm install && cd netlify/functions && npm install && cd ../../ && npm run build"
   publish = "build"
-  functions = "netlify/functions"
+  command = "npm run build"
 
 [build.environment]
-  NODE_VERSION = "20"
-  NPM_FLAGS = "--legacy-peer-deps"
+  NODE_VERSION = "18"
+  NPM_VERSION = "8"
 
-[functions]
-  node_bundler = "esbuild"
-  external_node_modules = ["@google/generative-ai", "ioredis", "node-fetch"]
-  
-  [functions.timeout]
-    default = 9.5  # Matches backend timeout + buffer
-
-[build.processing]
-  skip_processing = false
-  
-  [build.processing.css]
-    bundle = true
-    minify = true
-  
-  [build.processing.js]
-    bundle = true
-    minify = true
-  
-  [build.processing.html]
-    pretty_urls = true
-
-[[plugins]]
-  package = "@netlify/plugin-sitemap"
-
-# Security headers
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "DENY"
-    X-Content-Type-Options = "nosniff"
-    X-XSS-Protection = "1; mode=block"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-    Content-Security-Policy = """
-      default-src 'self';
-      script-src 'self' 'unsafe-inline' 'unsafe-eval' 
-        https://identity.netlify.com 
-        https://www.googletagmanager.com 
-        https://www.google-analytics.com;
-      style-src 'self' 'unsafe-inline' 
-        https://fonts.googleapis.com;
-      img-src 'self' data: 
-        https://www.google-analytics.com;
-      connect-src 'self' 
-        https://*.googleapis.com 
-        https://api.deepseek.com 
-        https://www.google-analytics.com 
-        https://ssl.google-analytics.com;
-      font-src 'self' 
-        https://fonts.gstatic.com 
-        data:;
-      frame-src 'self' 
-        https://app.netlify.com;
-      object-src 'none';
-      base-uri 'self';
-      form-action 'self';
-    """
-
-[[headers]]
-  for = "/static/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-
-# API routing
-[[redirects]]
-  from = "/api/ai-proxy"
-  to = "/.netlify/functions/ai-proxy"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/ai-proxy"
-  to = "/.netlify/functions/ai-proxy"
-  status = 200
-  force = true
-
-# Health check endpoint
-[[redirects]]
-  from = "/health"
-  to = "/.netlify/functions/ai-proxy"
-  status = 200
-  force = true
-
-# Frontend routing (SPA support)
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# Environment variables (should be set in Netlify UI)
-[context.production.environment]
-  GEMINI_API_KEY = "your_gemini_api_key"
-  DEEPSEEK_API_KEY = "your_deepseek_api_key"
-  REDIS_URL = "your_redis_url_optional"
-  NODE_ENV = "production"
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
 
-[context.deploy-preview.environment]
-  NODE_ENV = "development"
+[[headers]]
+  for = "*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "*.woff2"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
