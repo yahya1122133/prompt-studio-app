@@ -1,11 +1,23 @@
 {
-  "short_name": "Prompt Studio",
-  "name": "Prompt Studio - AI Prompt Engineering Studio",
+  "short_name": "Promptmakers",
+  "name": "Promptmakers - AI Prompt Engineering Studio",
+  "description": "A powerful studio for crafting, testing, and managing AI prompts with support for multiple AI providers.",
   "icons": [
     {
       "src": "favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/x-icon"
+    },
+    {
+      "src": "favicon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "logo192.png",
@@ -18,11 +30,69 @@
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any maskable"
+    },
+    {
+      "src": "web-app-manifest-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "web-app-manifest-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "theme_color": "#111827",
-  "background_color": "#030712"
+  "theme_color": "#4f46e5",
+  "background_color": "#111827",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": [
+    "productivity",
+    "developer",
+    "ai",
+    "tools"
+  ],
+  "screenshots": [
+    {
+      "src": "logo512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Promptmakers - AI Prompt Studio"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Prompt",
+      "short_name": "New",
+      "description": "Create a new AI prompt",
+      "url": "/?action=new",
+      "icons": [
+        {
+          "src": "favicon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "My Library",
+      "short_name": "Library",
+      "description": "Open saved prompts library",
+      "url": "/?action=library",
+      "icons": [
+        {
+          "src": "favicon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
 }

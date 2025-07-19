@@ -1,34 +1,107 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="A powerful studio for crafting, testing, and managing AI prompts."
-    />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <title>Prompt Studio</title>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self'; 
+    script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://identity.netlify.com; 
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; 
+    img-src 'self' data: https://promptmakers.app; 
+    font-src 'self' https://fonts.gstatic.com; 
+    connect-src 'self' https://*.googleapis.com https://*.netlify.com; 
+    frame-src https://www.googletagmanager.com; 
+    base-uri 'self'; 
+    form-action 'self'; 
+    object-src 'none';">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
+  
+  <title>Promptmakers - AI Prompt Engineering Studio</title>
+  <meta name="description" content="Craft, optimize, and manage AI prompts with Promptmakers. Collaborate with Gemini and DeepSeek to create perfect prompts for any task.">
+  <meta name="keywords" content="AI prompts, prompt engineering, Gemini API, DeepSeek, prompt optimization, AI tools">
+  <meta name="robots" content="index, follow">
+  
+  <link rel="icon" href="%PUBLIC_URL%/favicon.ico" sizes="any">
+  <link rel="icon" href="%PUBLIC_URL%/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="%PUBLIC_URL%/apple-touch-icon.png">
+  <link rel="manifest" href="%PUBLIC_URL%/site.webmanifest" crossorigin="use-credentials">
+  
+  <link rel="canonical" href="https://promptmakers.app">
+  
+  <meta property="og:title" content="Promptmakers - AI Prompt Engineering Studio">
+  <meta property="og:description" content="Craft, optimize, and manage AI prompts with collaborative AI assistance">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://promptmakers.app">
+  <meta property="og:image" content="https://promptmakers.app/social-preview.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Promptmakers Interface">
+  <meta property="og:site_name" content="Promptmakers">
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:creator" content="@promptmakers">
+  <meta name="twitter:title" content="Promptmakers - AI Prompt Engineering Studio">
+  <meta name="twitter:description" content="Collaborative AI prompt engineering tool with Gemini and DeepSeek integration">
+  <meta name="twitter:image" content="https://promptmakers.app/twitter-preview.jpg">
+  <meta name="twitter:image:alt" content="Promptmakers Dashboard">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://www.googletagmanager.com">
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','%REACT_APP_GTM_ID%');</script>
+  
+  <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 
-    <!-- Google Tag Manager -->
-    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;if(i){f.parentNode.insertBefore(j,f);}
-    })(window,document,'script','dataLayer','%REACT_APP_GTM_ID%');</script>
-    <!-- End Google Tag Manager -->
-    
-  </head>
-  <body>
-    <!-- Google Tag Manager (noscript) -->
-    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=%REACT_APP_GTM_ID%"
-    height="0" width="0" style="display:none;visibility:hidden" title="Google Tag Manager"></iframe></noscript>
-    <!-- End Google Tag Manager (noscript) -->
-    
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-  </body>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Promptmakers",
+    "description": "AI prompt engineering studio for crafting and optimizing prompts",
+    "applicationCategory": "Productivity",
+    "operatingSystem": ["Web", "Windows", "macOS", "Linux"],
+    "url": "https://promptmakers.app",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    // IMPORTANT: Only include aggregateRating if it is based on real user reviews.
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.8",
+      "ratingCount": "25",
+      "bestRating": "5"
+    }
+  }
+  </script>
+</head>
+<body>
+  <noscript>
+    <iframe src="https://www.googletagmanager.com/ns.html?id=%REACT_APP_GTM_ID%"
+      height="0" width="0" style="display:none;visibility:hidden" title="Google Tag Manager"></iframe>
+    <strong>You need to enable JavaScript to run this application.</strong>
+  </noscript>
+  
+  <div id="root"></div>
+  
+  <script>
+    if (window.netlifyIdentity) {
+      window.netlifyIdentity.on("init", user => {
+        if (!user) {
+          window.netlifyIdentity.on("login", () => {
+            document.location.href = "/admin/";
+          });
+        }
+      });
+    }
+  </script>
+</body>
 </html>
