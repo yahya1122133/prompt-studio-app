@@ -5,14 +5,14 @@
 
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const fetch = require('node-fetch');
-const Redis = require('ioredis');
+// const Redis = require('ioredis'); // Disabled temporarily
 
 // ================ Configuration ================
 const CONFIG = {
     MAX_INPUT_LENGTH: 1500,
     MAX_OUTPUT_LENGTH: 5000,
-    TIMEOUT_MS: 25000,       // 25 seconds (within Netlify limit)
-    CONNECT_TIMEOUT_MS: 5000, // 5 seconds
+    TIMEOUT_MS: 20000,       // 20 seconds (within Netlify limit)
+    CONNECT_TIMEOUT_MS: 10000, // 10 seconds
     MAX_RETRIES: 1,
     RATE_LIMIT: 8,
     GLOBAL_RATE_LIMIT: 100,
@@ -47,13 +47,9 @@ const logger = {
     error: (error, context = {}) => console.error(JSON.stringify({ level: 'ERROR', timestamp: new Date().toISOString(), message: error.message, name: error.name, stack: error.stack, ...context })),
 };
 
-const redisClient = process.env.REDIS_URL ? new Redis(process.env.REDIS_URL) : null;
-if (redisClient) {
-    redisClient.on('error', err => logger.error(new Error('Redis Client Error'), { redisError: err.message }));
-    logger.info('Redis client configured.');
-} else {
-    logger.warn('Redis URL not found. Falling back to in-memory services.');
-}
+// Disable Redis temporarily due to connection issues
+const redisClient = null;
+logger.warn('Redis disabled. Using in-memory fallbacks for rate limiting and caching.');
 
 // Pre-warm the Gemini client
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
@@ -205,47 +201,7 @@ function validateEnvironment() {
 }
 
 // ================ Async Response System ================
-const asyncResponseManager = {
-    init: () => {
-        if (!redisClient) return;
-        
-        // Note: Removed setInterval cleaner - not suitable for serverless
-        // Redis TTL will handle cleanup automatically
-        logger.info('Async response manager initialized - relying on Redis TTL for cleanup');
-    },
-    
-    storeResponse: async (requestId, data) => {
-        if (!redisClient) return false;
-        try {
-            await redisClient.setex(
-                `async_response:${requestId}`, 
-                300, // 5 minute TTL
-                JSON.stringify({
-                    ...data,
-                    timestamp: Date.now()
-                })
-            );
-            return true;
-        } catch (error) {
-            logger.error('Failed to store async response', error);
-            return false;
-        }
-    },
-    
-    getResponse: async (requestId) => {
-        if (!redisClient) return null;
-        try {
-            const data = await redisClient.get(`async_response:${requestId}`);
-            return data ? JSON.parse(data) : null;
-        } catch (error) {
-            logger.error('Failed to get async response', error);
-            return null;
-        }
-    }
-};
-
-// Note: Async system disabled for Netlify compatibility
-// if (redisClient) asyncResponseManager.init();
+// Disabled - Redis not available
 
 // ================ Timeout Helper Function ================
 const promiseWithTimeout = (promise, timeoutMs, connectTimeoutMs) => {
