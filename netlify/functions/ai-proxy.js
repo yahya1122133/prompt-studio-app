@@ -11,8 +11,8 @@ const Redis = require('ioredis');
 const CONFIG = {
     MAX_INPUT_LENGTH: 1500,
     MAX_OUTPUT_LENGTH: 5000,
-    TIMEOUT_MS: 8500,        // 8.5 seconds
-    CONNECT_TIMEOUT_MS: 3000, // 3 seconds
+    TIMEOUT_MS: 6000,        // 6 seconds (safer for Netlify)
+    CONNECT_TIMEOUT_MS: 2000, // 2 seconds
     MAX_RETRIES: 1,
     RATE_LIMIT: 8,
     GLOBAL_RATE_LIMIT: 100,
@@ -479,6 +479,16 @@ exports.handler = async (event) => {
         context.duration = Date.now() - startTime;
         logger.info('Request successful', context);
 
+        const responseBody = { 
+            provider, 
+            ...result, 
+            metrics: { 
+                duration: context.duration, 
+                requestId: context.requestId,
+                timestamp: new Date().toISOString()
+            } 
+        };
+
         return {
             statusCode: 200,
             headers: { 
@@ -486,15 +496,7 @@ exports.handler = async (event) => {
                 'X-RateLimit-Limit': CONFIG.RATE_LIMIT.toString(),
                 'X-RateLimit-Window': (CONFIG.RATE_WINDOW_MS / 1000).toString()
             },
-            body: JSON.stringify({ 
-                provider, 
-                ...result, 
-                metrics: { 
-                    duration: context.duration, 
-                    requestId: context.requestId,
-                    timestamp: new Date().toISOString()
-                } 
-            })
+            body: JSON.stringify(responseBody)
         };
 
     } catch (error) {
@@ -510,22 +512,34 @@ exports.handler = async (event) => {
         const statusCode = error instanceof ApiError ? error.statusCode : 500;
         const message = error instanceof ApiError ? error.message : 'An internal server error occurred.';
         
-        return {
-            statusCode,
-            headers: { 
-                'Content-Type': 'application/json',
-                'X-RateLimit-Limit': CONFIG.RATE_LIMIT.toString(),
-                'X-RateLimit-Window': (CONFIG.RATE_WINDOW_MS / 1000).toString()
-            },
-            body: JSON.stringify({ 
-                error: { 
-                    type: error.name || 'InternalError', 
-                    message, 
-                    requestId: context.requestId,
-                    timestamp: new Date().toISOString()
-                } 
-            })
+        const errorBody = { 
+            error: { 
+                type: error.name || 'InternalError', 
+                message, 
+                requestId: context.requestId,
+                timestamp: new Date().toISOString()
+            } 
         };
+
+        try {
+            return {
+                statusCode,
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-RateLimit-Limit': CONFIG.RATE_LIMIT.toString(),
+                    'X-RateLimit-Window': (CONFIG.RATE_WINDOW_MS / 1000).toString()
+                },
+                body: JSON.stringify(errorBody)
+            };
+        } catch (jsonError) {
+            // Fallback if JSON.stringify fails
+            logger.error('JSON stringify failed', jsonError);
+            return {
+                statusCode: 500,
+                headers: { 'Content-Type': 'application/json' },
+                body: '{"error":{"type":"JSONError","message":"Failed to serialize response","timestamp":"' + new Date().toISOString() + '"}}'
+            };
+        }
     }
 };
 

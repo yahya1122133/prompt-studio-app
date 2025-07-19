@@ -234,7 +234,15 @@ export const PromptProvider = ({ children }) => {
         if (!isMountedRef.current) return;
         try {
             const pollResponse = await fetch(`/api/ai-proxy?requestId=${requestId}`);
-            const pollData = await pollResponse.json();
+            
+            let pollData;
+            try {
+                pollData = await pollResponse.json();
+            } catch (jsonError) {
+                console.error('Poll JSON parse error:', jsonError);
+                const text = await pollResponse.text();
+                throw new Error(`Invalid JSON response during polling. Status: ${pollResponse.status}. Response: ${text.substring(0, 200)}...`);
+            }
             if (pollResponse.status === 202) {
                 dispatch({ type: 'SET_POLL_COUNT', payload: state.pollCount + 1 });
                 timeoutRef.current = setTimeout(() => pollForResponse(requestId, finalPrompt, showStatus), 2500);
@@ -295,7 +303,15 @@ export const PromptProvider = ({ children }) => {
             });
 
             if (signal.aborted) return;
-            const data = await response.json();
+            
+            let data;
+            try {
+                data = await response.json();
+            } catch (jsonError) {
+                console.error('JSON parse error:', jsonError);
+                const text = await response.text();
+                throw new Error(`Invalid JSON response from server. Status: ${response.status}. Response: ${text.substring(0, 200)}...`);
+            }
 
             if (response.status === 202) {
                 dispatch({ type: 'SET_ASYNC_REQUEST_ID', payload: data.requestId });
