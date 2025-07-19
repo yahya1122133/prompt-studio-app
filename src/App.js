@@ -8,12 +8,12 @@ import React, {
   useRef,
   Suspense // This was the missing piece
 } from 'react';
-// Removed AnimatePresence import for better performance
+import { AnimatePresence } from 'framer-motion';
 import { PromptProvider, usePromptContext } from './context/PromptContext';
 import PropTypes from 'prop-types';
 
-// Centralized lazy loading imports - using optimized version
-const AppContent = React.lazy(() => import('./components/AppContentOptimized'));
+// Centralized lazy loading imports - using original design
+const AppContent = React.lazy(() => import('./components/AppContent'));
 const PromptLibrary = React.lazy(() => import('./components/features/PromptLibrary'));
 const DeleteConfirmation = React.lazy(() => import('./components/features/DeleteConfirmation'));
 const Footer = React.lazy(() => import('./components/layouts/Footer'));
@@ -53,8 +53,14 @@ const AppController = () => {
   }, []);
 
   // Modal handlers with smooth transitions
-  const handleShowLibrary = () => startTransition(() => setShowLibrary(true));
-  const handlePromptDeleteRequest = (prompt) => startTransition(() => setPromptToDelete(prompt));
+  const handleOpenLibrary = () => startTransition(() => setShowLibrary(true));
+  const handleDeleteRequest = (prompt) => startTransition(() => setPromptToDelete(prompt));
+  const handleLibrarySelect = (prompt) => {
+    if (dispatch) {
+      dispatch({ type: 'SET_INPUT', payload: prompt });
+    }
+    handleCloseModals();
+  };
   const handleCloseModals = () => startTransition(() => {
     setShowLibrary(false);
     setPromptToDelete(null);
@@ -91,22 +97,22 @@ const AppController = () => {
     <div className="min-h-screen bg-gray-900 text-gray-200 bg-grid-white/[0.05]">
       <Suspense fallback={<GlobalLoader />}>
         <AppContent
-          onShowLibrary={handleShowLibrary}
-          onPromptDelete={handlePromptDeleteRequest}
+          onShowLibrary={handleOpenLibrary}
           showStatus={showStatus}
           isPending={isPending}
         />
       </Suspense>
 
-      <div>
+      <AnimatePresence mode="wait">
         {/* Prompt Library Modal */}
         {showLibrary && (
           <Suspense fallback={<ModalLoader />} key="library-modal">
             <div ref={modalRef} aria-modal="true">
               <PromptLibrary
                 onClose={handleCloseModals}
-                onSelectDelete={handlePromptDeleteRequest}
-                showStatus={showStatus}
+                onSelectPrompt={handleLibrarySelect}
+                onDeletePrompt={handleDeleteRequest}
+                onShowStatus={showStatus}
               />
             </div>
           </Suspense>
@@ -135,7 +141,7 @@ const AppController = () => {
             />
           </Suspense>
         )}
-      </div>
+      </AnimatePresence>
 
       {/* Footer */}
       <Suspense fallback={<div className="h-24 bg-gray-800/50" />}>
