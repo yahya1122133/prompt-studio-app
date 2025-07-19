@@ -8,8 +8,9 @@ import { usePromptContext } from '../../context/PromptContext';
 
 const PromptLibrary = ({ 
   onClose, 
-  onSelectDelete,
-  showStatus
+  onSelectPrompt,
+  onDeletePrompt,
+  onShowStatus
 }) => {
   const { state, dispatch } = usePromptContext();
   const { savedPrompts, librarySearchTerm } = state;
@@ -38,13 +39,17 @@ const PromptLibrary = ({
       dispatch({ type: 'SET_PROMPT_TEMPLATE', payload: prompt.template });
       dispatch({ type: 'SET_VARIABLES', payload: prompt.variables || [] });
       dispatch({ type: 'SET_PROMPT_NAME', payload: prompt.name });
+      if (onSelectPrompt) {
+        onSelectPrompt(prompt);
+      }
+      onShowStatus?.('Prompt selected!', 'success');
       onClose();
     });
   };
 
   const handleDeleteClick = (promptId) => {
     startTransition(() => {
-      onSelectDelete(promptId);
+      onDeletePrompt(promptId);
     });
   };
 
@@ -135,8 +140,9 @@ const PromptLibrary = ({
 
 PromptLibrary.propTypes = {
   onClose: PropTypes.func.isRequired,
-  onSelectDelete: PropTypes.func.isRequired,
-  showStatus: PropTypes.func.isRequired
+  onSelectPrompt: PropTypes.func,
+  onDeletePrompt: PropTypes.func.isRequired,
+  onShowStatus: PropTypes.func.isRequired
 };
 
 export default PromptLibrary; 
