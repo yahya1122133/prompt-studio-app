@@ -233,7 +233,7 @@ export const PromptProvider = ({ children }) => {
     const pollForResponse = useCallback(async (requestId, finalPrompt, showStatus) => {
         if (!isMountedRef.current) return;
         try {
-            const pollResponse = await fetch(`/api/ai-proxy?requestId=${requestId}`);
+            const pollResponse = await fetch(`/.netlify/functions/ai-proxy?requestId=${requestId}`);
             
             let pollData;
             try {
@@ -290,7 +290,7 @@ export const PromptProvider = ({ children }) => {
         startProgressSimulation();
         
         try {
-            const response = await fetch('/api/ai-proxy', {
+            const response = await fetch('/.netlify/functions/ai-proxy', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

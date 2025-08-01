@@ -1,31 +1,56 @@
 /**
- * @file Production-ready AI proxy with timeout optimization and async fallback
- * @version 4.2.0
+ * @file Production-ready AI proxy with streaming support, optimized for serverless environments.
+ * @version 5.1.0
  */
 
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const fetch = require('node-fetch');
-// const Redis = require('ioredis'); // Disabled temporarily
+const https = require('https');
+const crypto = require('crypto');
+const redis = require('redis');
 
 // ================ Configuration ================
 const CONFIG = {
     MAX_INPUT_LENGTH: 1500,
     MAX_OUTPUT_LENGTH: 5000,
-    TIMEOUT_MS: 20000,       // 20 seconds (within Netlify limit)
-    CONNECT_TIMEOUT_MS: 10000, // 10 seconds
-    MAX_RETRIES: 1,
-    RATE_LIMIT: 8,
-    GLOBAL_RATE_LIMIT: 100,
+    TIMEOUT_MS: 25000,
+    MAX_RETRIES: 2,
+    RATE_LIMIT: 15,
     RATE_WINDOW_MS: 60000,
-    CACHE_TTL_SECONDS: 300,   // 5 minute cache
+    CACHE_TTL_SECONDS: 600,
     CIRCUIT_BREAKER_THRESHOLD: 3,
     CIRCUIT_BREAKER_TIMEOUT_MS: 60000,
     DEFAULT_PROVIDER: 'auto',
     DEFAULT_TEMP: 0.7,
-    ASYNC_MODE: false,        // Disabled - not compatible with Netlify Functions
-    ASYNC_WAIT_MS: 2000,      // Unused - kept for compatibility
-    ASYNC_TOKEN_LIMIT: 1024   // Unused - kept for compatibility
+    DEFAULT_TOKEN_LIMIT: 1024,
+    KEEP_ALIVE_SOCKETS: 25,
+    BASE_PATH: process.env.BASE_PATH || '/.netlify/functions/ai-proxy'
 };
+
+// ================ Core Services ================
+const logger = {
+    info: (message, context = {}) => console.log(JSON.stringify({ level: 'INFO', timestamp: new Date().toISOString(), message, ...context })),
+    warn: (message, context = {}) => console.warn(JSON.stringify({ level: 'WARN', timestamp: new Date().toISOString(), message, ...context })),
+    error: (error, context = {}) => console.error(JSON.stringify({ level: 'ERROR', timestamp: new Date().toISOString(), message: error.message, name: error.name, stack: error.stack, ...context })),
+    perf: (metric, value, context = {}) => console.log(JSON.stringify({ level: 'PERF', timestamp: new Date().toISOString(), metric, value, ...context }))
+};
+
+// ================ Keep-Alive Agent ================
+const keepAliveAgent = new https.Agent({
+    keepAlive: true,
+    maxSockets: CONFIG.KEEP_ALIVE_SOCKETS,
+    freeSocketTimeout: 30000,
+});
+
+// ================ Redis Initialization ================
+let redisClient = null;
+if (process.env.REDIS_URL) {
+    redisClient = redis.createClient({ url: process.env.REDIS_URL });
+    redisClient.on('error', (err) => logger.error('Redis error', { error: err.message }));
+    redisClient.connect().catch(err => logger.error('Redis connection failed', { error: err.message }));
+} else {
+    logger.warn('Redis disabled. Using in-memory fallbacks. Not suitable for production.');
+}
 
 // ================ Custom Error Classes ================
 class ApiError extends Error {
@@ -39,472 +64,581 @@ class ValidationError extends ApiError { constructor(message) { super(message, 4
 class RateLimitError extends ApiError { constructor(message = 'Rate limit exceeded.') { super(message, 429); } }
 class TimeoutError extends ApiError { constructor(message = 'The request timed out.') { super(message, 504); } }
 class CircuitBreakerOpenError extends ApiError { constructor(message = 'Service is temporarily unavailable.') { super(message, 503); } }
+class StreamingError extends ApiError { constructor(message = 'Streaming not supported in this environment.') { super(message, 501); } }
 
-// ================ Core Services ================
-const logger = {
-    info: (message, context = {}) => console.log(JSON.stringify({ level: 'INFO', timestamp: new Date().toISOString(), message, ...context })),
-    warn: (message, context = {}) => console.warn(JSON.stringify({ level: 'WARN', timestamp: new Date().toISOString(), message, ...context })),
-    error: (error, context = {}) => console.error(JSON.stringify({ level: 'ERROR', timestamp: new Date().toISOString(), message: error.message, name: error.name, stack: error.stack, ...context })),
-};
-
-// Disable Redis temporarily due to connection issues
-const redisClient = null;
-logger.warn('Redis disabled. Using in-memory fallbacks for rate limiting and caching.');
-
-// Pre-warm the Gemini client
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
-const geminiModel = genAI ? genAI.getGenerativeModel({ model: "gemini-1.5-flash" }) : null;
-if (!geminiModel) {
-    logger.warn('Gemini client not initialized. Check GEMINI_API_KEY environment variable.');
+// ================ Pre-warm AI Clients ================
+let geminiModel = null;
+if (process.env.GEMINI_API_KEY) {
+    try {
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        logger.info('Gemini client initialized');
+    } catch (err) {
+        logger.error('Gemini initialization failed', { error: err.message });
+    }
 }
 
 // ================ Rate Limiter ================
 const rateLimiter = {
-    inMemoryStore: new Map(),
     check: async (ip) => {
         if (redisClient) {
-            // Use pipeline for better performance
-            const pipeline = redisClient.pipeline();
-            pipeline.incr('rate_limit:global');
-            pipeline.expire('rate_limit:global', 60);
-            pipeline.incr(`rate_limit:${ip}`);
-            pipeline.expire(`rate_limit:${ip}`, Math.ceil(CONFIG.RATE_WINDOW_MS / 1000));
-            
-            const results = await pipeline.exec();
-            const globalCount = results[0][1];
-            const ipCount = results[2][1];
-
-            if (globalCount > CONFIG.GLOBAL_RATE_LIMIT) {
-                throw new RateLimitError('Global rate limit exceeded. Please try again later.');
+            const key = `rate_limit:${ip}`;
+            const current = await redisClient.incr(key);
+            if (current === 1) {
+                await redisClient.expire(key, Math.ceil(CONFIG.RATE_WINDOW_MS / 1000));
             }
-            if (ipCount > CONFIG.RATE_LIMIT) {
-                throw new RateLimitError('Per-IP rate limit exceeded.');
-            }
-        } else {
-            const now = Date.now();
-            const windowStart = now - CONFIG.RATE_WINDOW_MS;
-            const userRequests = (rateLimiter.inMemoryStore.get(ip) || []).filter(t => t > windowStart);
-            if (userRequests.length >= CONFIG.RATE_LIMIT) {
+            if (current > CONFIG.RATE_LIMIT) {
                 throw new RateLimitError();
             }
-            userRequests.push(now);
-            rateLimiter.inMemoryStore.set(ip, userRequests);
+        } else {
+            // In-memory fallback
+            const now = Date.now();
+            const key = `rate_limit:${ip}`;
+            const windowStart = now - CONFIG.RATE_WINDOW_MS;
             
-            // Clean up old entries to prevent memory leaks
-            if (rateLimiter.inMemoryStore.size > 1000) {
-                for (const [key, timestamps] of rateLimiter.inMemoryStore) {
-                    const validTimestamps = timestamps.filter(t => t > windowStart);
-                    if (validTimestamps.length === 0) {
-                        rateLimiter.inMemoryStore.delete(key);
-                    }
-                }
+            if (!rateLimiter.inMemoryStore) {
+                rateLimiter.inMemoryStore = new Map();
             }
+            
+            let requests = rateLimiter.inMemoryStore.get(key) || [];
+            requests = requests.filter(t => t > windowStart);
+            
+            if (requests.length >= CONFIG.RATE_LIMIT) {
+                throw new RateLimitError();
+            }
+            
+            requests.push(now);
+            rateLimiter.inMemoryStore.set(key, requests);
         }
     }
 };
 
 // ================ Resilience Patterns ================
-const createCircuitBreaker = () => {
-    const state = { 
-        failures: 0, 
-        lastFailure: 0, 
-        isOpen: false,
-        lastStateChange: Date.now()
-    };
-    
-    const logStateChange = (newState) => {
-        logger.info(`Circuit breaker state changed to ${newState}`, {
-            failures: state.failures,
-            lastFailure: new Date(state.lastFailure).toISOString(),
-            durationOpen: state.isOpen ? Date.now() - state.lastFailure : null
-        });
-    };
-    
+const createCircuitBreaker = (serviceName) => {
+    const state = { failures: 0, lastFailure: 0, isOpen: false };
     return async (fn) => {
-        const now = Date.now();
-        if (state.isOpen) {
-            if (now - state.lastFailure > CONFIG.CIRCUIT_BREAKER_TIMEOUT_MS) {
+        if (redisClient) {
+            const redisKey = `breaker:${serviceName}`;
+            const breakerState = await redisClient.get(redisKey);
+            if (breakerState) {
+                const { isOpen, lastFailure } = JSON.parse(breakerState);
+                if (isOpen && Date.now() - lastFailure < CONFIG.CIRCUIT_BREAKER_TIMEOUT_MS) {
+                    throw new CircuitBreakerOpenError();
+                }
+            }
+        } else if (state.isOpen) {
+            if (Date.now() - state.lastFailure > CONFIG.CIRCUIT_BREAKER_TIMEOUT_MS) {
                 state.isOpen = false;
-                state.lastStateChange = now;
-                logStateChange('half-open');
+                logger.info(`Circuit breaker for ${serviceName} is now half-open.`);
             } else {
                 throw new CircuitBreakerOpenError();
             }
         }
+
         try {
             const result = await fn();
-            if (state.failures > 0) {
-                logStateChange('closed');
+            if (state.failures > 0 || (redisClient && state.isOpen)) {
                 state.failures = 0;
-                state.lastStateChange = now;
+                state.isOpen = false;
+                logger.info(`Circuit breaker for ${serviceName} is now closed.`);
+                if (redisClient) {
+                    await redisClient.del(`breaker:${serviceName}`);
+                }
             }
             return result;
         } catch (error) {
             state.failures++;
-            state.lastFailure = now;
-            if (state.failures >= CONFIG.CIRCUIT_BREAKER_THRESHOLD && !state.isOpen) {
+            state.lastFailure = Date.now();
+            
+            if (state.failures >= CONFIG.CIRCUIT_BREAKER_THRESHOLD) {
                 state.isOpen = true;
-                state.lastStateChange = now;
-                logStateChange('open');
+                logger.warn(`Circuit breaker for ${serviceName} is now open.`);
+                if (redisClient) {
+                    await redisClient.set(
+                        `breaker:${serviceName}`,
+                        JSON.stringify({ isOpen: true, lastFailure: state.lastFailure }),
+                        'EX', Math.ceil(CONFIG.CIRCUIT_BREAKER_TIMEOUT_MS / 1000)
+                    );
+                }
             }
             throw error;
         }
     };
 };
 
-const withRetry = async (fn) => {
+const withRetry = async (fn, context) => {
     for (let i = 0; i <= CONFIG.MAX_RETRIES; i++) {
         try {
             return await fn();
         } catch (error) {
-            if (i === CONFIG.MAX_RETRIES || error instanceof CircuitBreakerOpenError || error instanceof ValidationError) {
+            if (i === CONFIG.MAX_RETRIES || 
+                error instanceof CircuitBreakerOpenError || 
+                error instanceof ValidationError) {
                 throw error;
             }
-            logger.warn(`Attempt ${i + 1} failed. Retrying...`, { error: error.message });
-            await new Promise(res => setTimeout(res, 1000 * (i + 1)));
+            logger.warn(`Attempt ${i + 1} failed. Retrying...`, { ...context, error: error.message });
+            await new Promise(res => setTimeout(res, 500 * Math.pow(2, i)));
         }
     }
 };
 
-// ================ Utility & Validation Functions ================
+// ================ Utility & Validation ================
 const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
-const smartTruncate = (text, maxLen) => text.length <= maxLen ? text : text.substring(0, text.lastIndexOf(' ', maxLen)) + '...';
-
-const validateApiKey = (key, serviceName) => {
-    if (!key || typeof key !== 'string' || key.length < 30) {
-        throw new ApiError(`Missing or invalid API key for ${serviceName}.`, 500);
-    }
-};
-
-const validateAndFormatApiResponse = (text) => {
-    if (typeof text !== 'string') throw new ApiError('Invalid API response type from model provider.', 502);
-    return text.length > CONFIG.MAX_OUTPUT_LENGTH ? smartTruncate(text, CONFIG.MAX_OUTPUT_LENGTH) : text;
-};
 
 const validateAndSanitizeInput = (input) => {
     if (typeof input !== 'string' || !input.trim()) throw new ValidationError('Prompt cannot be empty.');
     if (input.length > CONFIG.MAX_INPUT_LENGTH) throw new ValidationError(`Input exceeds ${CONFIG.MAX_INPUT_LENGTH} characters.`);
-    return input.replace(/[<>&"']/g, '');
+    return input;
 };
 
-function validateEnvironment() {
-    const requiredEnvVars = ['GEMINI_API_KEY', 'DEEPSEEK_API_KEY'];
-    const missingVars = requiredEnvVars.filter(env => !process.env[env]);
-    
-    if (missingVars.length > 0) {
-        throw new ApiError(`Configuration error: Missing environment variables: ${missingVars.join(', ')}.`, 500);
+const generateCacheKey = (provider, prompt, temp, tokenLimit) => {
+    const hash = crypto.createHash('sha256').update(`${provider}:${prompt}:${temp}:${tokenLimit}`).digest('hex');
+    return `cache:${hash}`;
+};
+
+// ================ Async Stream Helper ================
+async function* streamAsyncIterator(stream) {
+    const reader = stream.getReader();
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) return;
+            yield value;
+        }
+    } finally {
+        reader.releaseLock();
     }
-    
-    logger.info('Environment validation passed', { 
-        availableVars: requiredEnvVars.map(v => ({ [v]: !!process.env[v] }))
-    });
 }
-
-// ================ Async Response System ================
-// Disabled - Redis not available
-
-// ================ Timeout Helper Function ================
-const promiseWithTimeout = (promise, timeoutMs, connectTimeoutMs) => {
-    return new Promise((resolve, reject) => {
-        const connectTimer = setTimeout(() => {
-            clearTimeout(overallTimer);
-            reject(new TimeoutError(`Connection timed out after ${connectTimeoutMs}ms`));
-        }, connectTimeoutMs);
-
-        const overallTimer = setTimeout(() => {
-            clearTimeout(connectTimer);
-            reject(new TimeoutError(`Request timed out after ${timeoutMs}ms`));
-        }, timeoutMs);
-
-        promise
-            .then(result => {
-                clearTimeout(connectTimer);
-                clearTimeout(overallTimer);
-                resolve(result);
-            })
-            .catch(error => {
-                clearTimeout(connectTimer);
-                clearTimeout(overallTimer);
-                reject(error);
-            });
-    });
-};
 
 // ================ API Provider Implementations ================
-const geminiBreaker = createCircuitBreaker();
-const deepseekBreaker = createCircuitBreaker();
+const geminiBreaker = createCircuitBreaker('Gemini');
+const deepseekBreaker = createCircuitBreaker('DeepSeek');
 
-async function callGemini(prompt, temperature, tokenLimit = 768) {
-    return geminiBreaker(async () => {
-        if (!geminiModel) throw new ApiError('Gemini client not initialized.', 500);
-        
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), CONFIG.TIMEOUT_MS);
-        
-        try {
-            const result = await geminiModel.generateContent({
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-                generationConfig: { 
-                    temperature: clamp(temperature, 0.1, 1.0), 
-                    maxOutputTokens: tokenLimit
-                },
-                signal: controller.signal
-            });
-            
-            const response = await result.response;
-            const text = await response.text(); // Ensure we await this
-            return validateAndFormatApiResponse(text);
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                throw new TimeoutError('Gemini request timed out');
-            }
-            throw error;
-        } finally {
-            clearTimeout(timeout);
-        }
-    });
-}
-
-async function callDeepSeek(prompt, temperature, tokenLimit = 768) {
-    return deepseekBreaker(async () => {
-        const apiKey = process.env.DEEPSEEK_API_KEY;
-        validateApiKey(apiKey, 'DeepSeek');
-        
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), CONFIG.TIMEOUT_MS);
-        
-        try {
-            const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
-                method: "POST",
-                headers: { 
-                    "Authorization": `Bearer ${apiKey}`, 
-                    "Content-Type": "application/json" 
-                },
-                body: JSON.stringify({
-                    model: "deepseek-chat",
-                    messages: [{ role: "user", content: prompt }],
-                    temperature: clamp(temperature, 0.1, 1.0),
-                    max_tokens: tokenLimit,
-                    stream: false
-                }),
-                signal: controller.signal
-            });
-            
-            if (!response.ok) {
-                const errorBody = await response.text();
-                logger.error(`DeepSeek API error: ${response.status} - ${errorBody}`);
-                throw new ApiError(`DeepSeek API error: ${response.status}`, 502);
-            }
-            
-            const data = await response.json();
-            if (!data.choices?.[0]?.message?.content) {
-                throw new ApiError('Invalid response structure from DeepSeek API.', 502);
-            }
-            
-            return validateAndFormatApiResponse(data.choices[0].message.content);
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                throw new TimeoutError('DeepSeek API request timed out');
-            }
-            throw error;
-        } finally {
-            clearTimeout(timeout);
-        }
-    });
-}
-
-async function handleAutoMode(initialPrompt, temperature) {
-    // Create a stable cache key using hash instead of substring
-    const crypto = require('crypto');
-    const cacheKey = `auto_cache:${crypto.createHash('sha256').update(initialPrompt + temperature).digest('hex')}`;
-    if (redisClient) {
-        const cachedResult = await redisClient.get(cacheKey);
-        if (cachedResult) {
-            logger.info("Serving 'auto' mode response from cache.", { cacheKey });
-            return JSON.parse(cachedResult);
-        }
-    }
-
-    const singleCallPrompt = `
-        You are an expert prompt engineer. Your task is to analyze and improve a user's prompt in a single step.
-        User's Prompt: "${initialPrompt}"
-        Perform:
-        1. **Analyze:** Critically evaluate for clarity, specificity, and ambiguities.
-        2. **Improve:** Rewrite the prompt to be more effective.
-        3. **Justify:** Briefly explain why the new prompt is better.
-        Return a single JSON object with the keys "analysis", "justification", and "improvedPrompt". Do not return any other text.`;
-
-    const rawResult = await callGemini(singleCallPrompt, temperature, CONFIG.ASYNC_TOKEN_LIMIT);
-    let result;
+// Non-streaming implementations
+async function callGemini(prompt, temperature, tokenLimit, context) {
+    if (!geminiModel) throw new ApiError('Gemini service unavailable', 503);
+    
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), CONFIG.TIMEOUT_MS);
+    const start = Date.now();
 
     try {
-        const parsedResult = JSON.parse(rawResult);
-        result = {
-            text: parsedResult.improvedPrompt || "Could not generate improved prompt.",
-            diagnostics: {
-                original: initialPrompt,
-                analysis: parsedResult.analysis || "No analysis provided.",
-                validation: parsedResult.justification || "No justification provided."
-            }
-        };
-    } catch (e) {
-        logger.warn("Auto mode response was not valid JSON. Falling back to raw text.", { rawResult });
-        result = {
-            text: rawResult,
-            diagnostics: {
-                original: initialPrompt,
-                analysis: "Could not parse analysis from model response.",
-                validation: "Could not parse justification from model response."
-            }
-        };
+        const result = await geminiModel.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: {
+                temperature: clamp(temperature, 0.1, 1.0),
+                maxOutputTokens: tokenLimit
+            },
+            signal: controller.signal
+        });
+        const response = await result.response;
+        const duration = Date.now() - start;
+        logger.perf('gemini_response_time', duration, context);
+        return response.text();
+    } catch (error) {
+        if (error.name === 'AbortError') throw new TimeoutError('Gemini request timed out.');
+        throw error;
+    } finally {
+        clearTimeout(timeout);
     }
-
-    if (redisClient) {
-        await redisClient.setex(cacheKey, CONFIG.CACHE_TTL_SECONDS, JSON.stringify(result));
-    }
-    return result;
 }
 
+async function callDeepSeek(prompt, temperature, tokenLimit, context) {
+    if (!process.env.DEEPSEEK_API_KEY) throw new ApiError('DeepSeek service unavailable', 503);
+    
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), CONFIG.TIMEOUT_MS);
+    const start = Date.now();
+
+    try {
+        const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+                "Content-Type": "application/json",
+                "Accept-Encoding": "gzip, deflate, br"
+            },
+            body: JSON.stringify({
+                model: "deepseek-chat",
+                messages: [{ role: "user", content: prompt }],
+                temperature: clamp(temperature, 0.1, 1.0),
+                max_tokens: tokenLimit,
+                stream: false
+            }),
+            signal: controller.signal,
+            agent: keepAliveAgent
+        });
+
+        if (!response.ok) {
+            throw new ApiError(`DeepSeek API error: ${response.status}`, response.status);
+        }
+
+        const data = await response.json();
+        if (!data.choices?.[0]?.message?.content) {
+            throw new ApiError('Invalid response structure from DeepSeek API.', 502);
+        }
+        
+        const duration = Date.now() - start;
+        logger.perf('deepseek_response_time', duration, context);
+        return data.choices[0].message.content;
+    } catch (error) {
+        if (error.name === 'AbortError') throw new TimeoutError('DeepSeek API request timed out.');
+        throw error;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+// Streaming implementations
+async function callGeminiStream(prompt, temperature, tokenLimit, context, stream) {
+    if (!geminiModel) throw new ApiError('Gemini service unavailable', 503);
+    
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), CONFIG.TIMEOUT_MS);
+    const start = Date.now();
+
+    try {
+        const streamingResp = await geminiModel.generateContentStream({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: {
+                temperature: clamp(temperature, 0.1, 1.0),
+                maxOutputTokens: tokenLimit
+            },
+            signal: controller.signal
+        });
+
+        // Set SSE headers
+        stream.setContentType('text/event-stream');
+        stream.setHeader('Cache-Control', 'no-cache');
+        stream.setHeader('Connection', 'keep-alive');
+
+        // Convert Gemini stream to SSE format
+        for await (const chunk of streamingResp.stream) {
+            const text = chunk.text();
+            if (text) {
+                stream.write(`data: ${JSON.stringify({ text })}\n\n`);
+            }
+        }
+
+        logger.perf('gemini_stream_time', Date.now() - start, context);
+    } catch (error) {
+        if (error.name === 'AbortError') throw new TimeoutError('Gemini request timed out.');
+        throw error;
+    } finally {
+        clearTimeout(timeout);
+        stream.end();
+    }
+}
+
+async function callDeepSeekStream(prompt, temperature, tokenLimit, context, stream) {
+    if (!process.env.DEEPSEEK_API_KEY) throw new ApiError('DeepSeek service unavailable', 503);
+    
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), CONFIG.TIMEOUT_MS);
+    const start = Date.now();
+
+    try {
+        const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                model: "deepseek-chat",
+                messages: [{ role: "user", content: prompt }],
+                temperature: clamp(temperature, 0.1, 1.0),
+                max_tokens: tokenLimit,
+                stream: true
+            }),
+            signal: controller.signal,
+            agent: keepAliveAgent
+        });
+
+        if (!response.ok) {
+            throw new ApiError(`DeepSeek API error: ${response.status}`, response.status);
+        }
+
+        // Set SSE headers
+        stream.setContentType('text/event-stream');
+        stream.setHeader('Cache-Control', 'no-cache');
+        stream.setHeader('Connection', 'keep-alive');
+
+        // Pipe the stream directly to client
+        for await (const chunk of streamAsyncIterator(response.body)) {
+            stream.write(chunk);
+        }
+
+        logger.perf('deepseek_stream_time', Date.now() - start, context);
+    } catch (error) {
+        if (error.name === 'AbortError') throw new TimeoutError('DeepSeek request timed out.');
+        throw error;
+    } finally {
+        clearTimeout(timeout);
+        stream.end();
+    }
+}
+
+// Test provider implementations
+async function callTestProvider(prompt, temperature, tokenLimit, context) {
+    // Simulate a realistic response time
+    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+    
+    const responses = [
+        `Test response for: "${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}"`,
+        `Mock AI response: This is a generated response using temp=${temperature} and maxTokens=${tokenLimit}.`,
+        `Test Provider Response: Your prompt has been processed. This is a simulated response for testing purposes.`,
+        `Demo Response: I understand you want "${prompt.substring(0, 30)}${prompt.length > 30 ? '...' : ''}". This is a test response.`
+    ];
+    
+    return responses[Math.floor(Math.random() * responses.length)];
+}
+
+async function callTestProviderStream(prompt, temperature, tokenLimit, context, stream) {
+    const responses = [
+        "This is a test streaming response.",
+        "It simulates a real AI stream.",
+        `Your prompt: "${prompt.substring(0, 30)}${prompt.length > 30 ? '...' : ''}"`,
+        `Temperature: ${temperature}, Token limit: ${tokenLimit}`,
+        "End of test stream."
+    ];
+
+    // Set SSE headers
+    stream.setContentType('text/event-stream');
+    stream.setHeader('Cache-Control', 'no-cache');
+    stream.setHeader('Connection', 'keep-alive');
+
+    for (const text of responses) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        stream.write(`data: ${JSON.stringify({ text })}\n\n`);
+    }
+    stream.end();
+}
+
+// Auto mode handlers
+async function handleAutoMode(prompt, temperature, tokenLimit, context) {
+    try {
+        logger.info('Auto mode using Gemini', context);
+        return await callGemini(prompt, temperature, tokenLimit, context);
+    } catch (error) {
+        logger.warn('Auto mode falling back to DeepSeek', { ...context, error: error.message });
+        return await callDeepSeek(prompt, temperature, tokenLimit, context);
+    }
+}
+
+async function handleAutoModeStream(prompt, temperature, tokenLimit, context, stream) {
+    try {
+        logger.info('Auto mode using Gemini (stream)', context);
+        await callGeminiStream(prompt, temperature, tokenLimit, context, stream);
+    } catch (error) {
+        logger.warn('Auto mode falling back to DeepSeek (stream)', { ...context, error: error.message });
+        await callDeepSeekStream(prompt, temperature, tokenLimit, context, stream);
+    }
+}
+
+// Provider mappings
 const apiProviders = {
-    gemini: (prompt, temp, tokenLimit = 768) => callGemini(prompt, temp, tokenLimit).then(text => ({ text })),
-    deepseek: (prompt, temp, tokenLimit = 768) => callDeepSeek(prompt, temp, tokenLimit).then(text => ({ text })),
-    auto: (prompt, temp) => handleAutoMode(prompt, temp),
+    gemini: (prompt, temp, tokenLimit, ctx) => callGemini(prompt, temp, tokenLimit, ctx).then(text => ({ text })),
+    deepseek: (prompt, temp, tokenLimit, ctx) => callDeepSeek(prompt, temp, tokenLimit, ctx).then(text => ({ text })),
+    auto: (prompt, temp, tokenLimit, ctx) => handleAutoMode(prompt, temp, tokenLimit, ctx).then(text => ({ text })),
+    test: (prompt, temp, tokenLimit, ctx) => callTestProvider(prompt, temp, tokenLimit, ctx).then(text => ({ text })),
 };
 
-// ================ Initial Validation ================
-// Fail fast on startup if environment is invalid
-validateEnvironment();
+const apiProvidersStream = {
+    gemini: (prompt, temp, tokenLimit, ctx, stream) => 
+        geminiBreaker(() => callGeminiStream(prompt, temp, tokenLimit, ctx, stream)),
+    deepseek: (prompt, temp, tokenLimit, ctx, stream) => 
+        deepseekBreaker(() => callDeepSeekStream(prompt, temp, tokenLimit, ctx, stream)),
+    auto: (prompt, temp, tokenLimit, ctx, stream) => 
+        handleAutoModeStream(prompt, temp, tokenLimit, ctx, stream),
+    test: (prompt, temp, tokenLimit, ctx, stream) => 
+        callTestProviderStream(prompt, temp, tokenLimit, ctx, stream)
+};
 
 // ================ Main Handler ================
-exports.handler = async (event) => {
-    // Health Check Route
+exports.handler = async (event, context) => {
+    // Health check endpoint
     if (event.path.endsWith('/health')) {
+        return { statusCode: 200, body: JSON.stringify({ 
+            status: 'ok', 
+            version: '5.1.0',
+            providers: {
+                gemini: !!process.env.GEMINI_API_KEY,
+                deepseek: !!process.env.DEEPSEEK_API_KEY,
+                test: true,
+                auto: true
+            },
+            features: {
+                streaming: true
+            }
+        }) };
+    }
+
+    // Handle incorrect base path
+    if (!event.path.startsWith(CONFIG.BASE_PATH)) {
         return {
-            statusCode: 200,
+            statusCode: 404,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                status: 'ok',
-                version: '4.2.0',
-                timestamp: new Date().toISOString()
+                error: {
+                    type: 'NotFound',
+                    message: `Endpoint not found. Use ${CONFIG.BASE_PATH} for API access.`,
+                    validEndpoints: [
+                        `${CONFIG.BASE_PATH}`,
+                        `${CONFIG.BASE_PATH}/health`
+                    ]
+                }
             })
         };
     }
 
-    const context = {
-        requestId: Math.random().toString(36).substring(2, 9),
-        clientIP: event.headers['x-nf-client-connection-ip'] || 'unknown',
-        cfRay: event.headers['cf-ray'] || 'none',
-        userAgent: event.headers['user-agent'] || 'unknown',
-        memoryUsage: process.memoryUsage()
+    const reqContext = {
+        requestId: crypto.randomBytes(8).toString('hex'),
+        clientIP: event.headers['x-forwarded-for'] || event.headers['x-nf-client-connection-ip'] || 'unknown',
     };
     const startTime = Date.now();
 
     try {
-        if (event.httpMethod !== 'POST') throw new ApiError('Method Not Allowed', 405);
-        await rateLimiter.check(context.clientIP);
+        if (event.httpMethod !== 'POST') {
+            return {
+                statusCode: 405,
+                headers: { 'Content-Type': 'application/json', 'Allow': 'POST' },
+                body: JSON.stringify({
+                    error: {
+                        type: 'MethodNotAllowed',
+                        message: 'Only POST requests are supported',
+                        requestId: reqContext.requestId
+                    }
+                })
+            };
+        }
+
+        await rateLimiter.check(reqContext.clientIP);
 
         const body = JSON.parse(event.body || '{}');
-        const { provider = CONFIG.DEFAULT_PROVIDER, prompt, temperature = CONFIG.DEFAULT_TEMP, requestId } = body;
-        context.provider = provider;
+        const {
+            provider = CONFIG.DEFAULT_PROVIDER,
+            prompt,
+            temperature = CONFIG.DEFAULT_TEMP,
+            tokenLimit = CONFIG.DEFAULT_TOKEN_LIMIT,
+            stream = false
+        } = body;
         
-        // Validate required fields
+        reqContext.provider = provider;
+        reqContext.streaming = stream;
+        
         if (!prompt) throw new ValidationError('Prompt is required');
-        if (!Object.keys(apiProviders).includes(provider)) {
-            throw new ValidationError(`Invalid provider. Available: ${Object.keys(apiProviders).join(', ')}`);
+        if (!apiProviders[provider]) throw new ValidationError(`Invalid provider. Available: ${Object.keys(apiProviders).join(', ')}`);
+
+        // Handle streaming requests
+        if (stream) {
+            if (!event.serverlessStream) {
+                throw new StreamingError();
+            }
+
+            // Validate provider availability
+            if (provider === 'gemini' && !geminiModel) throw new ApiError('Gemini service unavailable', 503);
+            if (provider === 'deepseek' && !process.env.DEEPSEEK_API_KEY) throw new ApiError('DeepSeek service unavailable', 503);
+            
+            const cleanPrompt = validateAndSanitizeInput(prompt);
+            const safeTemp = clamp(temperature, 0.1, 1.0);
+            const safeTokenLimit = clamp(tokenLimit, 64, 4096);
+
+            const providerFn = apiProvidersStream[provider] || apiProvidersStream.auto;
+            await providerFn(cleanPrompt, safeTemp, safeTokenLimit, reqContext, event.serverlessStream);
+            
+            logger.info('Streaming request completed', { ...reqContext });
+            return;
         }
 
-        // Note: Async response polling disabled - not compatible with Netlify Functions
-        if (requestId) {
-            throw new ApiError('Async processing not supported in this deployment', 400);
-        }
+        // Non-streaming request handling
+        if (provider === 'gemini' && !geminiModel) throw new ApiError('Gemini service unavailable', 503);
+        if (provider === 'deepseek' && !process.env.DEEPSEEK_API_KEY) throw new ApiError('DeepSeek service unavailable', 503);
 
         const cleanPrompt = validateAndSanitizeInput(prompt);
         const safeTemp = clamp(temperature, 0.1, 1.0);
+        const safeTokenLimit = clamp(tokenLimit, 64, 4096);
 
-        const providerFunction = apiProviders[provider];
-        
-        const promiseToExecute = () => 
-            promiseWithTimeout(
-                providerFunction(cleanPrompt, safeTemp), 
-                CONFIG.TIMEOUT_MS,
-                CONFIG.CONNECT_TIMEOUT_MS
-            );
-            
-        const result = await withRetry(promiseToExecute);
-        
-        context.duration = Date.now() - startTime;
-        logger.info('Request successful', context);
+        // Check response cache
+        const cacheKey = generateCacheKey(provider, cleanPrompt, safeTemp, safeTokenLimit);
+        if (redisClient) {
+            const cachedResponse = await redisClient.get(cacheKey);
+            if (cachedResponse) {
+                logger.info('Serving from cache', { ...reqContext, cacheKey });
+                return {
+                    statusCode: 200,
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-Cache': 'HIT'
+                    },
+                    body: cachedResponse
+                };
+            }
+        }
 
-        const responseBody = { 
-            provider, 
-            ...result, 
+        // Process request
+        const providerFunction = () => apiProviders[provider](cleanPrompt, safeTemp, safeTokenLimit, reqContext);
+        const result = await withRetry(providerFunction, reqContext);
+        const duration = Date.now() - startTime;
+
+        // Prepare final response
+        const responseData = JSON.stringify({
+            provider,
+            ...result,
             metrics: { 
-                duration: context.duration, 
-                requestId: context.requestId,
-                timestamp: new Date().toISOString()
-            } 
-        };
+                duration, 
+                requestId: reqContext.requestId,
+                retries: reqContext.retries || 0
+            }
+        });
 
+        // Cache response
+        if (redisClient && !result.error) {
+            await redisClient.set(cacheKey, responseData, 'EX', CONFIG.CACHE_TTL_SECONDS);
+        }
+
+        logger.info('Request successful', { ...reqContext, duration, cacheKey });
+        
         return {
             statusCode: 200,
             headers: { 
                 'Content-Type': 'application/json',
-                'X-RateLimit-Limit': CONFIG.RATE_LIMIT.toString(),
-                'X-RateLimit-Window': (CONFIG.RATE_WINDOW_MS / 1000).toString()
+                'X-Cache': 'MISS'
             },
-            body: JSON.stringify(responseBody)
+            body: responseData
         };
 
     } catch (error) {
-        context.duration = Date.now() - startTime;
-        context.errorType = error.name;
-        context.errorMessage = error.message;
-        
-        logger.error(error, context);
-        
-        // Note: Async fallback removed - not compatible with Netlify Functions
-        // Background processing is terminated when function returns response
+        const duration = Date.now() - startTime;
+        logger.error(error, { ...reqContext, duration });
         
         const statusCode = error instanceof ApiError ? error.statusCode : 500;
         const message = error instanceof ApiError ? error.message : 'An internal server error occurred.';
-        
-        const errorBody = { 
-            error: { 
-                type: error.name || 'InternalError', 
-                message, 
-                requestId: context.requestId,
-                timestamp: new Date().toISOString()
-            } 
-        };
 
-        try {
-            return {
-                statusCode,
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'X-RateLimit-Limit': CONFIG.RATE_LIMIT.toString(),
-                    'X-RateLimit-Window': (CONFIG.RATE_WINDOW_MS / 1000).toString()
-                },
-                body: JSON.stringify(errorBody)
-            };
-        } catch (jsonError) {
-            // Fallback if JSON.stringify fails
-            logger.error('JSON stringify failed', jsonError);
-            return {
-                statusCode: 500,
-                headers: { 'Content-Type': 'application/json' },
-                body: '{"error":{"type":"JSONError","message":"Failed to serialize response","timestamp":"' + new Date().toISOString() + '"}}'
-            };
+        // Handle streaming errors
+        if (reqContext.streaming && event.serverlessStream) {
+            event.serverlessStream.setContentType('application/json');
+            event.serverlessStream.writeHead(statusCode);
+            event.serverlessStream.end(JSON.stringify({
+                error: { 
+                    type: error.name || 'InternalError', 
+                    message, 
+                    requestId: reqContext.requestId 
+                }
+            }));
+            return;
         }
+
+        return {
+            statusCode,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                error: { 
+                    type: error.name || 'InternalError', 
+                    message, 
+                    requestId: reqContext.requestId 
+                }
+            })
+        };
     }
 };
-
-// ================ Global Error Handlers ================
-process.on('unhandledRejection', (reason, promise) => {
-    logger.error('Unhandled Rejection at:', { promise, reason });
-});
-
-process.on('uncaughtException', (error) => {
-    logger.error('Uncaught Exception thrown:', error);
-    process.exit(1);
-});

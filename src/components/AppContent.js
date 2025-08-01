@@ -1,10 +1,8 @@
-// src/components/AppContent.js
-
 import React, { useMemo, useState, useCallback, lazy, Suspense } from 'react';
 import { 
   ArrowRight, Book, Bot, Copy, History, 
   Loader2, Save, Settings, 
-  Wand2, Plus, Sparkles 
+  Wand2, Plus, Sparkles, X, Maximize 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PropTypes from 'prop-types';
@@ -19,10 +17,17 @@ const PromptRating = lazy(() => import('./PromptRating'));
 const Spinner = React.memo(() => <Loader2 className="animate-spin" size={16} />);
 Spinner.displayName = 'Spinner';
 
-const IconButton = React.memo(({ children, onClick, disabled = false, tooltip, 'aria-label': ariaLabel }) => {
+const IconButton = React.memo(({ 
+  children, 
+  onClick, 
+  disabled = false, 
+  tooltip, 
+  'aria-label': ariaLabel,
+  className = '' 
+}) => {
   const [showTooltip, setShowTooltip] = useState(false);
   return (
-    <div className="relative group">
+    <div className={`relative group ${className}`}>
       <button
         onClick={onClick}
         disabled={disabled}
@@ -55,14 +60,13 @@ IconButton.propTypes = {
   onClick: PropTypes.func, 
   disabled: PropTypes.bool, 
   tooltip: PropTypes.string, 
-  'aria-label': PropTypes.string 
+  'aria-label': PropTypes.string,
+  className: PropTypes.string 
 };
 IconButton.displayName = 'IconButton';
 
 
 // --- MAIN COMPONENT DEFINITION ---
-// FIX: Define the component as a const (a function expression).
-// This prevents the "already declared" error.
 const AppContentComponent = ({ onShowLibrary, showStatus, isPending }) => {
   const { 
     state, 
@@ -79,6 +83,7 @@ const AppContentComponent = ({ onShowLibrary, showStatus, isPending }) => {
   } = state;
   
   const [showClearHistoryConfirm, setShowClearHistoryConfirm] = useState(false);
+  const [fullViewResponse, setFullViewResponse] = useState(null);
   
   const handleConfirmClearHistory = useCallback(() => {
     dispatch({ type: 'CLEAR_HISTORY' });
@@ -146,6 +151,61 @@ const AppContentComponent = ({ onShowLibrary, showStatus, isPending }) => {
     <div
       className="max-w-7xl mx-auto p-4 lg:p-6"
     >
+      {/* Full View Modal for Response History */}
+      <AnimatePresence>
+        {fullViewResponse && (
+          <motion.div 
+            className="fixed inset-0 bg-black/90 backdrop-blur-lg z-[100] flex flex-col"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="flex justify-between items-center p-4 border-b border-white/10">
+              <h2 className="text-xl font-bold text-white">
+                Response from {fullViewResponse.provider}
+              </h2>
+              <div className="flex gap-2">
+                <IconButton 
+                  onClick={() => {
+                    handleCopyToClipboard(fullViewResponse.text, 'Response copied!');
+                  }}
+                  tooltip="Copy response"
+                  aria-label="Copy full response"
+                >
+                  <Copy size={20} />
+                </IconButton>
+                <IconButton 
+                  onClick={() => setFullViewResponse(null)}
+                  tooltip="Close"
+                  aria-label="Close full view"
+                >
+                  <X size={20} />
+                </IconButton>
+              </div>
+            </div>
+            
+            <div className="flex-grow overflow-y-auto p-4 md:p-8">
+              <pre className="whitespace-pre-wrap break-words text-gray-200 text-base md:text-lg">
+                {fullViewResponse.text}
+              </pre>
+            </div>
+            
+            <div className="p-4 border-t border-white/10 flex justify-center">
+              <Button 
+                onClick={() => {
+                  dispatch({ type: 'SET_API_RESPONSE', payload: fullViewResponse });
+                  setFullViewResponse(null);
+                }}
+                variant="primary"
+                aria-label="Set as current response"
+              >
+                Set as Current Response
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <div className="flex items-center gap-3 mb-4 sm:mb-0">
           <Sparkles className="w-8 h-8 text-yellow-400" />
@@ -259,7 +319,7 @@ const AppContentComponent = ({ onShowLibrary, showStatus, isPending }) => {
                 <div>
                   <h3 className="block text-sm font-medium text-gray-300 mb-1.5">Model Provider</h3>
                   <div className="flex gap-2 flex-wrap">
-                    {['auto', 'gemini', 'deepseek'].map(p => (
+                    {['auto', 'gemini', 'deepseek', 'test'].map(p => (
                       <Button 
                         key={p} 
                         onClick={() => dispatch({type: 'SET_PROVIDER', payload: p})}
@@ -407,22 +467,34 @@ const AppContentComponent = ({ onShowLibrary, showStatus, isPending }) => {
                 <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
                   {responseHistory.map((r, i) => (
                     <div 
-                    key={r.id || r.timestamp || i}
-                    className="group relative text-sm p-2 bg-white/5 rounded-md border border-white/10 text-gray-400 truncate hover:bg-white/10 transition-colors cursor-pointer" 
-                    onClick={() => dispatch({ type: 'SET_API_RESPONSE', payload: r })}
-                    aria-label={`View response from ${r.provider}`}
+                      key={r.id || r.timestamp || i}
+                      className="group relative text-sm p-2 bg-white/5 rounded-md border border-white/10 text-gray-400 hover:bg-white/10 transition-colors cursor-pointer"
+                      onClick={() => setFullViewResponse(r)}
+                      aria-label={`View response from ${r.provider}`}
                     >
-                      {r.text}
-                      <IconButton 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCopyToClipboard(r.text, 'Copied!');
-                        }} 
-                        className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100" 
-                        aria-label="Copy response"
-                      >
-                        <Copy size={14} />
-                      </IconButton>
+                      <div className="whitespace-pre-wrap break-words line-clamp-3">
+                        {r.text}
+                      </div>
+                      <div className="absolute right-2 top-2 flex gap-1 opacity-0 group-hover:opacity-100">
+                        <IconButton 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyToClipboard(r.text, 'Copied!');
+                          }} 
+                          aria-label="Copy response"
+                        >
+                          <Copy size={14} />
+                        </IconButton>
+                        <IconButton 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFullViewResponse(r);
+                          }}
+                          aria-label="View full response"
+                        >
+                          <Maximize size={14} />
+                        </IconButton>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -524,6 +596,4 @@ AppContentComponent.propTypes = {
   isPending: PropTypes.bool,
 };
 
-// This is the single, correct export statement for the file.
-// It exports a memoized version of the component with a default export.
 export default React.memo(AppContentComponent);

@@ -1,15 +1,25 @@
+# Netlify Build Configuration
 [build]
   publish = "build"
   command = "npm run build"
 
 [build.environment]
-  NODE_VERSION = "18"
-  NPM_VERSION = "8"
+  NODE_VERSION = "20"
+  NPM_VERSION = "10"
 
-# Redirects handled by _redirects file
+# Netlify Functions Configuration
+[functions]
+  directory = "functions"
+  node_bundler = "esbuild" # Faster function packaging
+  # The .env file is not included for security. Use the Netlify UI for production environment variables.
 
+  # Keeps the function warm to reduce cold starts.
+  # Note: This uses build minutes and function invocations.
+  [[functions.scheduling]]
+    cron = "*/5 * * * *" # Every 5 minutes
+    path = "/.netlify/functions/ai-proxy/health" # Make sure 'ai-proxy' is the name of your function file.
 
-
+# Header rules for aggressive asset caching
 [[headers]]
   for = "*.js"
   [headers.values]
@@ -32,3 +42,18 @@
   for = "/static/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# Optimized headers for dynamic serverless functions
+[[headers]]
+  for = "/.netlify/functions/*"
+  [headers.values]
+    Cache-Control = "no-cache, max-age=0"
+    Connection = "keep-alive"
+    Keep-Alive = "timeout=10"
+    # IMPORTANT: For production, lock this down to your specific domain for security.
+    Access-Control-Allow-Origin = "*"
+
+# Node.js 20 specific optimizations for the production environment
+[context.production.environment]
+  AWS_LAMBDA_JS_RUNTIME = "nodejs20.x"
+  NODE_OPTIONS = "--enable-source-maps --max-http-header-size=16384"

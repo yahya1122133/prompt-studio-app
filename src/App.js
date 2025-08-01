@@ -6,11 +6,12 @@ import React, {
   useCallback, 
   useTransition,
   useRef,
-  Suspense // This was the missing piece
+  Suspense
 } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { PromptProvider, usePromptContext } from './context/PromptContext';
 import PropTypes from 'prop-types';
+import ErrorBoundary from './components/ui/loaders/ErrorBoundary';
 
 // Simple lazy loading for better stability
 const AppContent = React.lazy(() => import('./components/AppContent'));
@@ -20,7 +21,6 @@ const Footer = React.lazy(() => import('./components/layouts/Footer'));
 const Toast = React.lazy(() => import('./components/ui/Toast'));
 const GlobalLoader = React.lazy(() => import('./components/ui/loaders/GlobalLoader'));
 const ModalLoader = React.lazy(() => import('./components/ui/loaders/ModalLoader'));
-import ErrorBoundary from './components/ui/loaders/ErrorBoundary';
 
 /**
  * Main UI Controller Component
@@ -32,7 +32,8 @@ const AppController = () => {
   const [promptToDelete, setPromptToDelete] = useState(null);
   const [statusMessage, setStatusMessage] = useState(null);
   const [isPending, startTransition] = useTransition();
-  const modalRef = useRef(null);
+  const libraryModalRef = useRef(null);
+  const deleteModalRef = useRef(null);
   const toastTimerRef = useRef(null);
 
   // Cleanup all resources on unmount
@@ -83,8 +84,17 @@ const AppController = () => {
 
   // Accessibility: Focus trap for modals
   useEffect(() => {
-    if ((showLibrary || promptToDelete) && modalRef.current) {
-      const focusableElements = modalRef.current.querySelectorAll(
+    if (showLibrary && libraryModalRef.current) {
+      const focusableElements = libraryModalRef.current.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusableElements.length > 0) {
+        focusableElements[0].focus();
+      }
+    }
+    
+    if (promptToDelete && deleteModalRef.current) {
+      const focusableElements = deleteModalRef.current.querySelectorAll(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
       );
       if (focusableElements.length > 0) {
@@ -107,7 +117,7 @@ const AppController = () => {
         {/* Prompt Library Modal */}
         {showLibrary && (
           <Suspense fallback={<ModalLoader />} key="library-modal">
-            <div ref={modalRef} aria-modal="true">
+            <div ref={libraryModalRef} aria-modal="true" className="z-40">
               <PromptLibrary
                 onClose={handleCloseModals}
                 onSelectPrompt={handleLibrarySelect}
@@ -121,7 +131,7 @@ const AppController = () => {
         {/* Delete Confirmation Modal */}
         {promptToDelete && (
           <Suspense fallback={<ModalLoader />} key="delete-modal">
-            <div ref={modalRef} aria-modal="true">
+            <div ref={deleteModalRef} aria-modal="true" className="z-40">
               <DeleteConfirmation
                 prompt={promptToDelete}
                 onConfirm={handleConfirmDelete}

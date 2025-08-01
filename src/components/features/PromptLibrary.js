@@ -1,9 +1,8 @@
 // src/components/features/PromptLibrary.js
 import React, { useState, startTransition, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Search, Book, Copy, Trash2, X } from 'lucide-react';
-import Button from '../ui/Button';
 import { usePromptContext } from '../../context/PromptContext';
 
 const PromptLibrary = ({ 
