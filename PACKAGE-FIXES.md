@@ -41,19 +41,24 @@ install-strategy=hoisted
 maxsockets=15
 ```
 
-### 3. **Maintenance Scripts**
+### 3. **Node.js Engine Requirements**
+- **Required:** Node.js >=22.0.0, npm >=10.0.0
+- **Runtime:** Modern JavaScript features enabled
+- **Check:** Use `npm run health-check` to verify versions
+
+### 4. **Maintenance Scripts**
 - `npm run fix-package` - Clean install with optimizations
 - `npm run health-check` - Check Node/npm versions
 - `npm run update-deps` - Update dependencies safely
 - `npm run clean` - Automated maintenance script
 
-### 4. **Performance Utilities** (`src/utils/performance.js`)
+### 5. **Performance Utilities** (`src/utils/performance.js`)
 - Performance measurement functions
 - Memory monitoring
 - Bundle analysis tools
 - Web Vitals reporting
 
-### 5. **Improved Script Management**
+### 6. **Improved Script Management**
 - Added pre-build linting (optional)
 - Bundle analysis tools
 - Dependency update automation

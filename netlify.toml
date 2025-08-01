@@ -4,12 +4,12 @@
   command = "npm run build"
 
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22"
   NPM_VERSION = "10"
 
 # Netlify Functions Configuration
 [functions]
-  directory = "functions"
+  directory = "netlify/functions"
   node_bundler = "esbuild" # Faster function packaging
   # The .env file is not included for security. Use the Netlify UI for production environment variables.
 
@@ -53,7 +53,7 @@
     # IMPORTANT: For production, lock this down to your specific domain for security.
     Access-Control-Allow-Origin = "*"
 
-# Node.js 20 specific optimizations for the production environment
+# Node.js 22 specific optimizations for the production environment
 [context.production.environment]
-  AWS_LAMBDA_JS_RUNTIME = "nodejs20.x"
+  AWS_LAMBDA_JS_RUNTIME = "nodejs22.x"
   NODE_OPTIONS = "--enable-source-maps --max-http-header-size=16384"
