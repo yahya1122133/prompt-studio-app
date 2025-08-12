@@ -103,8 +103,6 @@ DeleteConfirmation.propTypes = {
   promptName: PropTypes.string
 };
 
-DeleteConfirmation.defaultProps = {
-  promptName: "this prompt"
-};
+// defaultProps removed in favor of default parameters
 
 export default DeleteConfirmation;

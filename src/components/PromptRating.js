@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import { Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const PromptRating = ({ prompt, source, initialRating = 0 }) => {
+const PromptRating = ({ prompt, source = 'unknown', initialRating = 0 }) => {
   const { dispatch } = usePromptContext();
   const [rating, setRating] = useState(initialRating);
   const [isRated, setIsRated] = useState(false);
@@ -101,9 +101,6 @@ PromptRating.propTypes = {
   initialRating: PropTypes.number
 };
 
-PromptRating.defaultProps = {
-  source: 'unknown',
-  initialRating: 0
-};
+// defaultProps removed in favor of default parameters
 
 export default PromptRating;

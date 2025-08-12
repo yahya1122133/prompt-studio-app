@@ -76,6 +76,17 @@ renderApp();
 if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
   window.addEventListener('load', async () => {
     try {
+      // Check if service worker file exists and has correct MIME type
+      const response = await fetch('/service-worker.js', { 
+        method: 'HEAD',
+        cache: 'no-cache'
+      });
+      
+      if (!response.ok || !response.headers.get('content-type')?.includes('javascript')) {
+        console.log('Service worker not found or invalid, skipping registration');
+        return;
+      }
+      
       const registration = await navigator.serviceWorker.register('/service-worker.js');
       console.log('ServiceWorker registered successfully:', registration.scope);
       
@@ -94,7 +105,8 @@ if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
         }
       });
     } catch (error) {
-      console.log('ServiceWorker registration failed:', error);
+      // Silently fail for service worker issues
+      console.log('ServiceWorker registration skipped:', error.message);
     }
   });
 }
